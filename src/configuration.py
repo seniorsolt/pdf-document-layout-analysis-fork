@@ -12,6 +12,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 service_logger = logging.getLogger(__name__)
 
 RESTART_IF_NO_GPU = os.environ.get("RESTART_IF_NO_GPU", "false").lower().strip() == "true"
+
+# Remote OCR (tables & formulas) via OpenAI-compatible HTTP endpoint (e.g. vLLM)
+REMOTE_OCR_ENABLED = os.environ.get("REMOTE_OCR_ENABLED", "false").lower().strip() == "true"
+REMOTE_OCR_BASE_URL = os.environ.get("REMOTE_OCR_BASE_URL", "http://vllm-ocr:8000/v1").strip()
+REMOTE_OCR_API_KEY = os.environ.get("REMOTE_OCR_API_KEY", "123").strip()
+REMOTE_OCR_MODEL = os.environ.get("REMOTE_OCR_MODEL", "nanonets/Nanonets-OCR2-1.5B-exp").strip()
+REMOTE_OCR_TEMPERATURE = float(os.environ.get("REMOTE_OCR_TEMPERATURE", "0.5"))
+REMOTE_OCR_TIMEOUT_SEC = float(os.environ.get("REMOTE_OCR_TIMEOUT_SEC", "120"))
+
 IMAGES_ROOT_PATH = Path(ROOT_PATH, "images")
 WORD_GRIDS_PATH = Path(ROOT_PATH, "word_grids")
 JSONS_ROOT_PATH = Path(ROOT_PATH, "jsons")

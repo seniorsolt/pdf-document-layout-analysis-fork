@@ -4,6 +4,8 @@ from domain.PdfImages import PdfImages
 from domain.PdfSegment import PdfSegment
 from pdf_token_type_labels import TokenType
 import latex2mathml.converter
+from configuration import REMOTE_OCR_ENABLED, service_logger
+from adapters.infrastructure.remote_ocr.vllm_openai_client import ocr_formula_latex
 
 
 def has_arabic(text: str) -> bool:
@@ -21,6 +23,37 @@ def is_valid_latex(formula: str) -> bool:
 def extract_formula_format(pdf_images: PdfImages, predicted_segments: list[PdfSegment]):
     formula_segments = [segment for segment in predicted_segments if segment.segment_type == TokenType.FORMULA]
     if not formula_segments:
+        return
+
+    if REMOTE_OCR_ENABLED:
+        service_logger.info(f"Remote OCR enabled: parsing {len(formula_segments)} formula segments via vLLM")
+        for formula_segment in formula_segments:
+            if has_arabic(formula_segment.text_content):
+                continue
+            try:
+                page_image: Image = pdf_images.pdf_images[formula_segment.page_number - 1]
+                left, top = formula_segment.bounding_box.left, formula_segment.bounding_box.top
+                right, bottom = formula_segment.bounding_box.right, formula_segment.bounding_box.bottom
+                left = int(left * pdf_images.dpi / 72)
+                top = int(top * pdf_images.dpi / 72)
+                right = int(right * pdf_images.dpi / 72)
+                bottom = int(bottom * pdf_images.dpi / 72)
+                formula_image = page_image.crop((left, top, right, bottom))
+                latex = ocr_formula_latex(formula_image)
+                if not latex:
+                    continue
+                latex = latex.strip()
+                # tolerate servers that still return $$...$$
+                if latex.startswith("$$") and latex.endswith("$$"):
+                    latex = latex[2:-2].strip()
+                if latex.startswith("\\(") and latex.endswith("\\)"):
+                    latex = latex[2:-2].strip()
+                if not is_valid_latex(latex):
+                    continue
+                formula_segment.text_content = f"$${latex}$$"
+            except Exception as e:
+                service_logger.warning(f"Remote formula OCR failed: {e}")
+                continue
         return
 
     model = LatexOCR()
