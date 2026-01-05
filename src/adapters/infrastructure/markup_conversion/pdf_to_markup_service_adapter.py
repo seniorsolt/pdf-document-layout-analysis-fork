@@ -379,6 +379,11 @@ class PdfToMarkupServiceAdapter:
 
         for page in pdf_features.pages:
             segments_in_page = [s for s in vgt_segments if s.page_number == page.page_number]
+            table_boxes_in_page = [
+                Rectangle.from_width_height(s.left, s.top, s.width, s.height)
+                for s in segments_in_page
+                if s.type == TokenType.TABLE
+            ]
             picture_id = 0
             for segment in segments_in_page:
                 seg_box = Rectangle.from_width_height(segment.left, segment.top, segment.width, segment.height)
@@ -396,6 +401,17 @@ class PdfToMarkupServiceAdapter:
                 elif segment.type in {TokenType.TITLE, TokenType.SECTION_HEADER}:
                     content_parts.append(self._process_title_segment(tokens_in_seg, segment))
                 elif segment.type == TokenType.FORMULA:
+                    # If the formula is inside a table region, skip it here to avoid
+                    # duplicating content: the table HTML already contains the LaTeX via markers replacement.
+                    if table_boxes_in_page:
+                        # Prefer a strict, numeric criterion (intersection) and fall back to center-in-table.
+                        inside_table = any(seg_box.get_intersection_percentage(tb) > 50 for tb in table_boxes_in_page)
+                        if not inside_table:
+                            cx = (seg_box.left + seg_box.right) / 2.0
+                            cy = (seg_box.top + seg_box.bottom) / 2.0
+                            inside_table = any((tb.left <= cx <= tb.right) and (tb.top <= cy <= tb.bottom) for tb in table_boxes_in_page)
+                        if inside_table:
+                            continue
                     content_parts.append(segment.text + "\n\n")
                 else:
                     content_parts.append(

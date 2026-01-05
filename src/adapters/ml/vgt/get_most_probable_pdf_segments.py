@@ -72,11 +72,23 @@ def get_merged_prediction_type(to_merge: list[Prediction]):
 
 def merge_colliding_predictions(predictions: list[Prediction]):
     predictions = [p for p in predictions if not p.score < 20]
+
+    # We intentionally do NOT merge Table(9) with Formula(3).
+    # Formulas often live inside tables; merging them would "eat" formula segments and
+    # break downstream per-formula OCR and table placeholder replacement.
+    def _is_table_formula_pair(a: Prediction, b: Prediction) -> bool:
+        return {a.category_id, b.category_id} == {9, 3}
+
     while True:
         new_predictions, merged = [], False
         while predictions:
             p1 = predictions.pop(0)
-            to_merge = [p for p in predictions if p1.bounding_box.get_intersection_percentage(p.bounding_box) > 0]
+            to_merge = [
+                p
+                for p in predictions
+                if (not _is_table_formula_pair(p1, p))
+                and p1.bounding_box.get_intersection_percentage(p.bounding_box) > 0
+            ]
             for prediction in to_merge:
                 predictions.remove(prediction)
             if to_merge:
