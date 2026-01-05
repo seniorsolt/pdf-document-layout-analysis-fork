@@ -3,9 +3,9 @@ services:
     image: vllm/vllm-openai:latest
     container_name: vllm-ocr
     command: >
-      --model nanonets/Nanonets-OCR2-1.5B-exp
+      --model nanonets/Nanonets-OCR2-3B
       --host 0.0.0.0 --port 8000
-      --gpu_memory_utilization 0.2
+      --gpu_memory_utilization 0.4
     gpus: all
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
