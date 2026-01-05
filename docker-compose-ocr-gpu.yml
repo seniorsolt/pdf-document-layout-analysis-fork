@@ -3,14 +3,14 @@ services:
     image: vllm/vllm-openai:latest
     container_name: vllm-ocr
     command: >
-      vllm serve nanonets/Nanonets-OCR2-1.5B-exp
+      --model nanonets/Nanonets-OCR2-1.5B-exp
       --host 0.0.0.0 --port 8000
       --gpu_memory_utilization 0.2
     ports:
       - "8000:8000"
     shm_size: "2gb"
     volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
       interval: 30s
