@@ -6,6 +6,10 @@ services:
       --model nanonets/Nanonets-OCR2-1.5B-exp
       --host 0.0.0.0 --port 8000
       --gpu_memory_utilization 0.2
+    gpus: all
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     ports:
       - "8000:8000"
     shm_size: "2gb"
@@ -16,13 +20,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 10
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
     networks:
       - pdf-analysis-network
 
@@ -34,20 +31,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    gpus: all
     ports:
       - "5060:5060"
     depends_on:
       vllm-ocr:
         condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
     environment:
       - RESTART_IF_NO_GPU=$RESTART_IF_NO_GPU
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - REMOTE_OCR_ENABLED=true
       - REMOTE_OCR_BASE_URL=http://vllm-ocr:8000/v1
       - REMOTE_OCR_API_KEY=123
