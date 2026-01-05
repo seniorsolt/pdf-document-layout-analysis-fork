@@ -46,22 +46,28 @@ def get_vgt_predictions(model_name: str) -> dict[str, list[Prediction]]:
         get_prediction_from_annotation(annotation, images_names, vgt_predictions_dict)
 
     # Debug: print raw VGT detections (before any filtering/merging/token assignment).
-    # This is intentionally unconditional to help local investigation.
-    service_logger.info("=== RAW VGT DETECTIONS (from coco_instances_results.json) ===")
+    # Intentionally unconditional for local investigation. Use both logger + stdout (docker logs).
+    header = "=== RAW VGT DETECTIONS v2 (from coco_instances_results.json) ==="
+    service_logger.info(header)
+    print(header, flush=True)
     for page_pdf_name in sorted(vgt_predictions_dict.keys()):
         preds = vgt_predictions_dict[page_pdf_name]
         counts = Counter([p.category_id for p in preds])
         counts_str = ", ".join(
             f"{DOCLAYNET_TYPE_BY_ID.get(cid, str(cid))}:{counts[cid]}" for cid in sorted(counts.keys())
         )
-        service_logger.info(f"[VGT][{page_pdf_name}] total={len(preds)} types=({counts_str})")
+        line = f"[VGT][{page_pdf_name}] total={len(preds)} types=({counts_str})"
+        service_logger.info(line)
+        print(line, flush=True)
         for p in sorted(preds, key=lambda x: (-x.score, x.category_id)):
             t = DOCLAYNET_TYPE_BY_ID.get(p.category_id, str(p.category_id))
             bb = p.bounding_box
-            service_logger.info(
-                f"[VGT][{page_pdf_name}] {t} score={p.score:.2f} bbox=({bb.left:.1f},{bb.top:.1f},{bb.width:.1f},{bb.height:.1f})"
-            )
-    service_logger.info("=== END RAW VGT DETECTIONS ===")
+            det = f"[VGT][{page_pdf_name}] {t} score={p.score:.2f} bbox=({bb.left:.1f},{bb.top:.1f},{bb.width:.1f},{bb.height:.1f})"
+            service_logger.info(det)
+            print(det, flush=True)
+    footer = "=== END RAW VGT DETECTIONS v2 ==="
+    service_logger.info(footer)
+    print(footer, flush=True)
 
     return vgt_predictions_dict
 
