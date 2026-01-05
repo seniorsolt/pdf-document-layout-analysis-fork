@@ -3,6 +3,7 @@ import pickle
 from os.path import join
 from pathlib import Path
 from statistics import mode
+from collections import Counter
 
 from domain.PdfSegment import PdfSegment
 from pdf_features import PdfFeatures
@@ -10,7 +11,7 @@ from pdf_features import PdfToken
 from pdf_features import Rectangle
 from pdf_token_type_labels import TokenType
 from domain.PdfImages import PdfImages
-from configuration import ROOT_PATH, DOCLAYNET_TYPE_BY_ID
+from configuration import ROOT_PATH, DOCLAYNET_TYPE_BY_ID, service_logger
 from domain.Prediction import Prediction
 
 
@@ -43,6 +44,24 @@ def get_vgt_predictions(model_name: str) -> dict[str, list[Prediction]]:
     vgt_predictions_dict = dict()
     for annotation in annotations:
         get_prediction_from_annotation(annotation, images_names, vgt_predictions_dict)
+
+    # Debug: print raw VGT detections (before any filtering/merging/token assignment).
+    # This is intentionally unconditional to help local investigation.
+    service_logger.info("=== RAW VGT DETECTIONS (from coco_instances_results.json) ===")
+    for page_pdf_name in sorted(vgt_predictions_dict.keys()):
+        preds = vgt_predictions_dict[page_pdf_name]
+        counts = Counter([p.category_id for p in preds])
+        counts_str = ", ".join(
+            f"{DOCLAYNET_TYPE_BY_ID.get(cid, str(cid))}:{counts[cid]}" for cid in sorted(counts.keys())
+        )
+        service_logger.info(f"[VGT][{page_pdf_name}] total={len(preds)} types=({counts_str})")
+        for p in sorted(preds, key=lambda x: (-x.score, x.category_id)):
+            t = DOCLAYNET_TYPE_BY_ID.get(p.category_id, str(p.category_id))
+            bb = p.bounding_box
+            service_logger.info(
+                f"[VGT][{page_pdf_name}] {t} score={p.score:.2f} bbox=({bb.left:.1f},{bb.top:.1f},{bb.width:.1f},{bb.height:.1f})"
+            )
+    service_logger.info("=== END RAW VGT DETECTIONS ===")
 
     return vgt_predictions_dict
 
