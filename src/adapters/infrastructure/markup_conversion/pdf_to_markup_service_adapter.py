@@ -1,9 +1,7 @@
-import fitz
 import tempfile
 import zipfile
 import io
 import json
-from fitz import Page
 from pathlib import Path
 from typing import Optional, Union
 from PIL.Image import Image
@@ -21,7 +19,6 @@ from pdf_token_type_labels.PdfLabels import PdfLabels
 from pdf_token_type_labels.TokenType import TokenType
 
 from adapters.infrastructure.markup_conversion.OutputFormat import OutputFormat
-from adapters.infrastructure.markup_conversion.Link import Link
 from adapters.infrastructure.markup_conversion.ExtractedImage import ExtractedImage
 from adapters.infrastructure.translation.ollama_container_manager import OllamaContainerManager
 from adapters.infrastructure.translation.translate_markup_document import translate_markup
@@ -150,106 +147,6 @@ class PdfToMarkupServiceAdapter:
             page_labels.append(PageLabels(number=page_number, labels=labels))
         return PdfLabels(pages=page_labels)
 
-    def _find_closest_segment(self, bounding_box: Rectangle, segments: list[SegmentBox]) -> Optional[SegmentBox]:
-        if not segments:
-            return None
-
-        def intersection_key(segment: SegmentBox) -> float:
-            segment_rect = Rectangle.from_width_height(segment.left, segment.top, segment.width, segment.height)
-            return bounding_box.get_intersection_percentage(segment_rect)
-
-        closest = max(segments, key=intersection_key)
-        max_intersection = intersection_key(closest)
-        if max_intersection > 0:
-            return closest
-
-        candidates = [s for s in segments if s.top > bounding_box.top]
-        if not candidates:
-            return None
-
-        def distance_key(segment: SegmentBox) -> tuple[float, float]:
-            vertical_dist = segment.top - bounding_box.top
-            segment_center_x = segment.left + segment.width / 2
-            box_center_x = bounding_box.left + bounding_box.width / 2
-            horizontal_dist = abs(segment_center_x - box_center_x)
-            return (vertical_dist, horizontal_dist)
-
-        return min(candidates, key=distance_key)
-
-    def _get_link_segments(
-        self, link: dict, page: Page, segments_by_page: dict[int, list[SegmentBox]]
-    ) -> Optional[tuple[SegmentBox, SegmentBox]]:
-        rect = link["from"]
-        source_box = Rectangle.from_coordinates(rect[0], rect[1], rect[2], rect[3])
-        source_page_num = page.number + 1
-        source_segments = segments_by_page.get(source_page_num, [])
-        source_segment = self._find_closest_segment(source_box, source_segments)
-        if not source_segment:
-            return None
-
-        dest_page_num = link.get("page", -1) + 1
-        dest_segments = segments_by_page.get(dest_page_num, [])
-        if not dest_segments:
-            return None
-
-        if "to" not in link:
-            dest_box = Rectangle.from_coordinates(0, 0, 20, 20)
-        else:
-            dest = link["to"] * page.transformation_matrix
-            dest_box = Rectangle.from_coordinates(dest[0], dest[1], dest[0] + 20, dest[1] + 20)
-
-        dest_segment = self._find_closest_segment(dest_box, dest_segments)
-        if not dest_segment:
-            return None
-
-        return source_segment, dest_segment
-
-    def _extract_links_by_segments(
-        self, pdf_path: Path, vgt_segments: list[SegmentBox]
-    ) -> tuple[dict[SegmentBox, list[Link]], dict[SegmentBox, list[Link]]]:
-        links_by_source: dict[SegmentBox, list[Link]] = {}
-        links_by_dest: dict[SegmentBox, list[Link]] = {}
-
-        segments_by_page: dict[int, list[SegmentBox]] = {}
-        for segment in vgt_segments:
-            segments_by_page.setdefault(segment.page_number, []).append(segment)
-
-        doc = fitz.open(pdf_path)
-        try:
-            for page_num in range(len(doc)):
-                page: Page = doc[page_num]
-                links = page.get_links()
-                for link in links:
-                    if "page" not in link:
-                        continue
-                    rect = link["from"]
-                    text = page.get_text("text", clip=rect).strip()
-                    if not text:
-                        continue
-                    segments_pair = self._get_link_segments(link, page, segments_by_page)
-                    if not segments_pair:
-                        continue
-                    source, dest = segments_pair
-                    new_link = Link(source_segment=source, destination_segment=dest, text=text)
-                    links_by_source.setdefault(source, []).append(new_link)
-                    links_by_dest.setdefault(dest, []).append(new_link)
-        finally:
-            doc.close()
-
-        return links_by_source, links_by_dest
-
-    def _insert_reference_links(self, segment_text: str, links: list[Link]) -> str:
-        offset = 0
-        for link in links:
-            start_idx = segment_text.find(link.text, offset)
-            if start_idx == -1:
-                continue
-            escaped_text = link.text.replace("[", "\\[").replace("]", "\\]")
-            md_link = f"[{escaped_text}](#{link.destination_segment.id})"
-            segment_text = segment_text[:start_idx] + md_link + segment_text[start_idx + len(link.text) :]
-            offset = start_idx + len(md_link)
-        return segment_text
-
     def _process_picture_segment(
         self,
         segment: SegmentBox,
@@ -280,10 +177,10 @@ class PdfToMarkupServiceAdapter:
         img_buffer = io.BytesIO()
         cropped.save(img_buffer, format="PNG")
         extracted_images.append(ExtractedImage(image_data=img_buffer.getvalue(), filename=image_name))
-        return f"<span id='{segment.id}'></span>\n" + f"<img src='{base_name}_pictures/{image_name}' alt=''>\n\n"
+        return f"<img src='{base_name}_pictures/{image_name}' alt=''>\n\n"
 
     def _process_table_segment(self, segment: SegmentBox) -> str:
-        return f"<span id='{segment.id}'></span>\n" + segment.text + "\n\n"
+        return segment.text + "\n\n"
 
     def _get_token_content(self, token: PdfToken) -> str:
         if self.output_format == OutputFormat.HTML:
@@ -313,23 +210,12 @@ class PdfToMarkupServiceAdapter:
             content = title_type.get_styled_content_html(content)
         else:
             content = title_type.get_styled_content_markdown(content)
-        anchor = f"<span id='{segment.id}'></span>\n"
-        return anchor + content + "\n\n"
+        return content + "\n\n"
 
-    def _process_regular_segment(
-        self,
-        tokens: list[PdfToken],
-        segment: SegmentBox,
-        links_by_source: dict[SegmentBox, list[Link]],
-        links_by_dest: dict[SegmentBox, list[Link]],
-    ) -> str:
+    def _process_regular_segment(self, tokens: list[PdfToken], segment: SegmentBox) -> str:
         if not tokens:
             return ""
         content = " ".join(self._get_token_content(t) for t in tokens)
-        if segment in links_by_source:
-            content = self._insert_reference_links(content, links_by_source[segment])
-        if segment in links_by_dest:
-            content = f"<span id='{segment.id}'></span>\n" + content
         return content + "\n\n"
 
     def _get_table_of_contents(self, vgt_segments: list[SegmentBox]) -> str:
@@ -340,18 +226,10 @@ class PdfToMarkupServiceAdapter:
                 continue
             first_word = segment.text.split()[0]
             indentation = max(0, first_word.count(".") - 1)
-            content = "  " * indentation + "- [" + segment.text + "](#" + segment.id + ")\n"
+            content = "  " * indentation + "- " + segment.text + "\n"
             table_of_contents += content
         table_of_contents += "\n"
         return table_of_contents + "\n\n"
-
-    def _set_segment_ids(self, vgt_segments: list[SegmentBox]) -> None:
-        segments_by_page: dict[int, list[SegmentBox]] = {}
-        for segment in vgt_segments:
-            segments_by_page.setdefault(segment.page_number, []).append(segment)
-        for page_number, segments in segments_by_page.items():
-            for segment_index, segment in enumerate(segments):
-                segment.id = f"page-{page_number}-{segment_index}"
 
     def _get_styled_content_parts(
         self,
@@ -367,12 +245,9 @@ class PdfToMarkupServiceAdapter:
         pdf_features.set_token_types(pdf_labels)
         pdf_features.set_token_styles()
 
-        self._set_segment_ids(vgt_segments)
         content_parts: list[str] = []
         if extract_toc:
             content_parts.append(self._get_table_of_contents(vgt_segments))
-
-        links_by_source, links_by_dest = self._extract_links_by_segments(pdf_path, vgt_segments)
 
         picture_segments = [s for s in vgt_segments if s.type == TokenType.PICTURE]
         pdf_images: list[Image] = convert_from_path(pdf_path, dpi=dpi) if picture_segments else []
@@ -399,7 +274,7 @@ class PdfToMarkupServiceAdapter:
                     content_parts.append(segment.text + "\n\n")
                 else:
                     content_parts.append(
-                        self._process_regular_segment(tokens_in_seg, segment, links_by_source, links_by_dest)
+                        self._process_regular_segment(tokens_in_seg, segment)
                     )
 
         return content_parts

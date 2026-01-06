@@ -10,12 +10,6 @@ def encode_html(text):
     italic_map = []
     bold_italic_map = []
 
-    # Helper to encode doc refs
-    def doc_ref_replacer(match):
-        idx = len(doc_ref_map)
-        doc_ref_map.append(match.group(0))
-        return f"[DOCREF{idx}]"
-
     # Helper to encode bold+italic
     def bold_italic_replacer(match):
         text_content = match.group(1)
@@ -30,16 +24,7 @@ def encode_html(text):
         bold_map.append(text_content)
         return f"[B{idx}]{text_content}[B{idx}]"
 
-    # 1. Encode document references FIRST - Updated patterns to match your actual format
-    # Handle patterns like [\[9,](#page-5-9), [10,](#page-5-10), [11\]](#page-5-11), [\[12\]](#page-5-12), [\[13\]](#page-5-13)
-    text = re.sub(r"(\[\\?\[?\*?\d+[,\.]?\\?\]?\]\(#page-\d+-\d+\))", doc_ref_replacer, text)
-
-    # Also handle the original patterns from markdown version
-    text = re.sub(r"(\[(?:\\?\d+[,\.]? ?)+\]\(#page-\d+-\d+\))", doc_ref_replacer, text)
-    text = re.sub(r"(\[\d+[,\.]?\]\(#page-\d+-\d+\))", doc_ref_replacer, text)
-    text = re.sub(r"(\[\*\d+[,\.]?\]\(#page-\d+-\d+\))", doc_ref_replacer, text)
-
-    # 2. Encode links BEFORE formatting - handle complex nested structures
+    # 1. Encode links BEFORE formatting - handle complex nested structures
     def find_and_replace_links(text):
         offset = 0  # Track how much the text has shifted due to replacements
 
@@ -103,15 +88,15 @@ def encode_html(text):
 
     text = find_and_replace_links(text)
 
-    # 3. Encode bold+italic combinations BEFORE individual bold/italic
+    # 2. Encode bold+italic combinations BEFORE individual bold/italic
     # Handle <b><i>text</i></b> and <i><b>text</b></i> - only simple cases without nested links
     text = re.sub(r"<b><i>([^<]+)</i></b>", bold_italic_replacer, text, flags=re.IGNORECASE)
     text = re.sub(r"<i><b>([^<]+)</b></i>", bold_italic_replacer, text, flags=re.IGNORECASE)
 
-    # 4. Encode bold (<b>text</b>) - only simple cases without nested tags
+    # 3. Encode bold (<b>text</b>) - only simple cases without nested tags
     text = re.sub(r"<b>([^<]+)</b>", bold_replacer, text, flags=re.IGNORECASE)
 
-    # 5. Encode italic (<i>text</i>) - handle cases that might contain encoded links
+    # 4. Encode italic (<i>text</i>) - handle cases that might contain encoded links
     def italic_with_links_replacer(match):
         content = match.group(1)
         idx = len(italic_map)

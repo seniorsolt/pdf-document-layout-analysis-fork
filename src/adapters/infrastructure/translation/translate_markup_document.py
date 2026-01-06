@@ -57,7 +57,7 @@ def get_table_of_contents(vgt_segments: list[SegmentBox]) -> str:
             continue
         first_word = segment.text.split()[0]
         indentation = max(0, first_word.count(".") - 1)
-        content = "  " * indentation + "- [" + segment.text + "](#" + segment.id + ")\n"
+        content = "  " * indentation + "- " + segment.text + "\n"
         table_of_contents += content
     table_of_contents += "\n"
     return table_of_contents + "\n\n"
@@ -87,16 +87,14 @@ def translate_markdown(
             translated_markdown_parts.append(markdown_part)
             continue
         if segments[index].type == TokenType.TABLE:
-            anchor, table_html = markdown_part.split("\n", 1)
-            content = prompt.format(target_language=target_language, text_to_translate=table_html)
+            content = prompt.format(target_language=target_language, text_to_translate=markdown_part)
             response = get_translation(ollama_manager, model, content, markdown_part)
-            translated_markdown_parts.append(anchor + "\n" + response)
+            translated_markdown_parts.append(response)
             continue
         if segments[index].type in {TokenType.TITLE, TokenType.SECTION_HEADER}:
-            anchor, text = markdown_part.split("\n")
-            content = prompt.format(target_language=target_language, text_to_translate=text)
+            content = prompt.format(target_language=target_language, text_to_translate=markdown_part)
             response = get_translation(ollama_manager, model, content, markdown_part)
-            translated_markdown_parts.append(anchor + "\n" + response)
+            translated_markdown_parts.append(response)
             if extract_toc:
                 title_segments.append(segments[index])
                 title_segments[-1].text = response.replace("#", "").strip()
@@ -138,16 +136,14 @@ def translate_html(
             translated_html_parts.append(html_part)
             continue
         if segments[index].type == TokenType.TABLE:
-            anchor, table_html = html_part.split("\n", 1)
-            content = prompt.format(target_language=target_language, text_to_translate=table_html)
+            content = prompt.format(target_language=target_language, text_to_translate=html_part)
             response = get_translation(ollama_manager, model, content, html_part)
-            translated_html_parts.append(anchor + "\n" + response)
+            translated_html_parts.append(response)
             continue
         if segments[index].type in {TokenType.TITLE, TokenType.SECTION_HEADER}:
-            anchor, text = html_part.split("\n")
-            content = prompt.format(target_language=target_language, text_to_translate=text)
+            content = prompt.format(target_language=target_language, text_to_translate=html_part)
             response = get_translation(ollama_manager, model, content, html_part)
-            translated_html_parts.append(anchor + "\n" + response)
+            translated_html_parts.append(response)
             if extract_toc:
                 title_segments.append(segments[index])
                 title_segments[-1].text = response.replace("#", "").strip()

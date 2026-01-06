@@ -366,18 +366,6 @@ class TestEndToEnd(TestCase):
 
         result = results.json()
 
-        span_elements = [
-            "<span id='page-1-0'></span>",
-            "<span id='page-1-1'></span>",
-            "<span id='page-1-2'></span>",
-            "<span id='page-1-3'></span>",
-            "<span id='page-1-4'></span>",
-            "<span id='page-1-8'></span>",
-            "<span id='page-1-11'></span>",
-            "<span id='page-1-12'></span>",
-            "<span id='page-1-13'></span>",
-        ]
-
         heading_elements = [
             "<h4><b>RESOLUCIÓN DE LA</b> <b>CORTE INTERAMERICANA DE DERECHOS HUMANOS</b> <b>DEL 29 DE JULIO DE 1991</b></h4>",
             "<h4><b>MEDIDAS PROVISIONALES SOLICITADAS POR LA COMISIÓN</b> <b>INTERAMERICANA DE DERECHOS HUMANOS</b> <b>RESPECTO DE GUATEMALA</b></h4>",
@@ -407,9 +395,6 @@ class TestEndToEnd(TestCase):
         ]
 
         self.assertEqual(200, results.status_code)
-
-        for span_element in span_elements:
-            self.assertIn(span_element, result)
 
         for heading_element in heading_elements:
             self.assertIn(heading_element, result)
