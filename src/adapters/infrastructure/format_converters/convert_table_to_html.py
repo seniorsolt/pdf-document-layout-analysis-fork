@@ -1,11 +1,18 @@
 from PIL import Image
+import asyncio
 from domain.PdfImages import PdfImages
 from domain.PdfSegment import PdfSegment
 from pdf_token_type_labels import TokenType
 from rapidocr import RapidOCR
 from rapid_table import ModelType, RapidTable, RapidTableInput
-from configuration import REMOTE_OCR_BASE_URL, REMOTE_OCR_ENABLED, REMOTE_OCR_MODEL, service_logger
-from adapters.infrastructure.remote_ocr.vllm_openai_client import ocr_table_html
+from configuration import (
+    REMOTE_OCR_BASE_URL,
+    REMOTE_OCR_ENABLED,
+    REMOTE_OCR_MAX_CONCURRENCY,
+    REMOTE_OCR_MODEL,
+    service_logger,
+)
+from adapters.infrastructure.remote_ocr.vllm_openai_client import ocr_table_html_async
 
 
 def extract_table_format(pdf_images: PdfImages, predicted_segments: list[PdfSegment]):
@@ -18,23 +25,32 @@ def extract_table_format(pdf_images: PdfImages, predicted_segments: list[PdfSegm
             f"Remote OCR enabled: parsing {len(table_segments)} table segments "
             f"via OpenAI-compatible endpoint (base_url={REMOTE_OCR_BASE_URL}, model={REMOTE_OCR_MODEL})"
         )
-        for table_segment in table_segments:
-            try:
-                page_image: Image = pdf_images.pdf_images[table_segment.page_number - 1]
-                left, top = table_segment.bounding_box.left, table_segment.bounding_box.top
-                right, bottom = table_segment.bounding_box.right, table_segment.bounding_box.bottom
-                left = int(left * pdf_images.dpi / 72)
-                top = int(top * pdf_images.dpi / 72)
-                right = int(right * pdf_images.dpi / 72)
-                bottom = int(bottom * pdf_images.dpi / 72)
-                table_image = page_image.crop((left, top, right, bottom))
-                html = ocr_table_html(table_image)
-                if not html:
-                    continue
-                table_segment.text_content = html
-            except Exception as e:
-                service_logger.warning(f"Remote table OCR failed: {e}")
-                continue
+
+        async def _run() -> None:
+            semaphore = asyncio.Semaphore(REMOTE_OCR_MAX_CONCURRENCY)
+
+            async def _process(table_segment: PdfSegment) -> None:
+                try:
+                    page_image: Image = pdf_images.pdf_images[table_segment.page_number - 1]
+                    left, top = table_segment.bounding_box.left, table_segment.bounding_box.top
+                    right, bottom = table_segment.bounding_box.right, table_segment.bounding_box.bottom
+                    left = int(left * pdf_images.dpi / 72)
+                    top = int(top * pdf_images.dpi / 72)
+                    right = int(right * pdf_images.dpi / 72)
+                    bottom = int(bottom * pdf_images.dpi / 72)
+                    table_image = page_image.crop((left, top, right, bottom))
+                    async with semaphore:
+                        html = await ocr_table_html_async(table_image)
+                    if not html:
+                        return
+                    table_segment.text_content = html
+                except Exception as e:
+                    service_logger.warning(f"Remote table OCR failed: {e}")
+                    return
+
+            await asyncio.gather(*(_process(seg) for seg in table_segments))
+
+        asyncio.run(_run())
         return
 
     input_args = RapidTableInput(model_type=ModelType["SLANETPLUS"])

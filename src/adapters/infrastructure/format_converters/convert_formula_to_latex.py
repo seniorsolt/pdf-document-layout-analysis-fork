@@ -1,11 +1,18 @@
 from PIL.Image import Image
+import asyncio
 from pix2tex.cli import LatexOCR
 from domain.PdfImages import PdfImages
 from domain.PdfSegment import PdfSegment
 from pdf_token_type_labels import TokenType
 import latex2mathml.converter
-from configuration import REMOTE_OCR_BASE_URL, REMOTE_OCR_ENABLED, REMOTE_OCR_MODEL, service_logger
-from adapters.infrastructure.remote_ocr.vllm_openai_client import ocr_formula_latex
+from configuration import (
+    REMOTE_OCR_BASE_URL,
+    REMOTE_OCR_ENABLED,
+    REMOTE_OCR_MAX_CONCURRENCY,
+    REMOTE_OCR_MODEL,
+    service_logger,
+)
+from adapters.infrastructure.remote_ocr.vllm_openai_client import ocr_formula_latex_async
 
 
 def has_arabic(text: str) -> bool:
@@ -30,33 +37,42 @@ def extract_formula_format(pdf_images: PdfImages, predicted_segments: list[PdfSe
             f"Remote OCR enabled: parsing {len(formula_segments)} formula segments "
             f"via OpenAI-compatible endpoint (base_url={REMOTE_OCR_BASE_URL}, model={REMOTE_OCR_MODEL})"
         )
-        for formula_segment in formula_segments:
-            if has_arabic(formula_segment.text_content):
-                continue
-            try:
-                page_image: Image = pdf_images.pdf_images[formula_segment.page_number - 1]
-                left, top = formula_segment.bounding_box.left, formula_segment.bounding_box.top
-                right, bottom = formula_segment.bounding_box.right, formula_segment.bounding_box.bottom
-                left = int(left * pdf_images.dpi / 72)
-                top = int(top * pdf_images.dpi / 72)
-                right = int(right * pdf_images.dpi / 72)
-                bottom = int(bottom * pdf_images.dpi / 72)
-                formula_image = page_image.crop((left, top, right, bottom))
-                latex = ocr_formula_latex(formula_image)
-                if not latex:
-                    continue
-                latex = latex.strip()
-                # tolerate servers that still return $$...$$
-                if latex.startswith("$$") and latex.endswith("$$"):
-                    latex = latex[2:-2].strip()
-                if latex.startswith("\\(") and latex.endswith("\\)"):
-                    latex = latex[2:-2].strip()
-                if not is_valid_latex(latex):
-                    continue
-                formula_segment.text_content = f"$${latex}$$"
-            except Exception as e:
-                service_logger.warning(f"Remote formula OCR failed: {e}")
-                continue
+
+        async def _run() -> None:
+            semaphore = asyncio.Semaphore(REMOTE_OCR_MAX_CONCURRENCY)
+
+            async def _process(formula_segment: PdfSegment) -> None:
+                if has_arabic(formula_segment.text_content):
+                    return
+                try:
+                    page_image: Image = pdf_images.pdf_images[formula_segment.page_number - 1]
+                    left, top = formula_segment.bounding_box.left, formula_segment.bounding_box.top
+                    right, bottom = formula_segment.bounding_box.right, formula_segment.bounding_box.bottom
+                    left = int(left * pdf_images.dpi / 72)
+                    top = int(top * pdf_images.dpi / 72)
+                    right = int(right * pdf_images.dpi / 72)
+                    bottom = int(bottom * pdf_images.dpi / 72)
+                    formula_image = page_image.crop((left, top, right, bottom))
+                    async with semaphore:
+                        latex = await ocr_formula_latex_async(formula_image)
+                    if not latex:
+                        return
+                    latex = latex.strip()
+                    # tolerate servers that still return $$...$$
+                    if latex.startswith("$$") and latex.endswith("$$"):
+                        latex = latex[2:-2].strip()
+                    if latex.startswith("\\(") and latex.endswith("\\)"):
+                        latex = latex[2:-2].strip()
+                    if not is_valid_latex(latex):
+                        return
+                    formula_segment.text_content = f"$${latex}$$"
+                except Exception as e:
+                    service_logger.warning(f"Remote formula OCR failed: {e}")
+                    return
+
+            await asyncio.gather(*(_process(seg) for seg in formula_segments))
+
+        asyncio.run(_run())
         return
 
     model = LatexOCR()

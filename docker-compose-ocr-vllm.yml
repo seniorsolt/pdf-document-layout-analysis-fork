@@ -46,6 +46,7 @@ services:
       REMOTE_OCR_MODEL: *remote_ocr_model
       REMOTE_OCR_TEMPERATURE: "0.5"
       REMOTE_OCR_TIMEOUT_SEC: "120"
+      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-4}
     networks:
       - pdf-analysis-network
 
