@@ -1,0 +1,32 @@
+x-remote-ocr-model: &remote_ocr_model qwen/qwen3-vl-8b-instruct
+
+services:
+  pdf-document-layout-analysis-gpu:
+    container_name: pdf-document-layout-analysis-gpu
+    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000" ]
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    gpus: all
+    ports:
+      - "5060:5060"
+    environment:
+      RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      REMOTE_OCR_ENABLED: "true"
+      REMOTE_OCR_BASE_URL: https://openrouter.ai/api/v1
+      REMOTE_OCR_API_KEY: ${OPENROUTER_API_KEY}
+      REMOTE_OCR_MODEL: *remote_ocr_model
+      REMOTE_OCR_TEMPERATURE: "0.5"
+      REMOTE_OCR_TIMEOUT_SEC: "120"
+    networks:
+      - pdf-analysis-network
+
+networks:
+  pdf-analysis-network:
+    driver: bridge
+
+

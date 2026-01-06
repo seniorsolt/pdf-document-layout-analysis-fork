@@ -31,7 +31,8 @@ def _pil_image_to_data_url(image: Image.Image, mime: str = "image/png") -> str:
 
 
 def _get_client() -> OpenAI:
-    # vLLM OpenAI server is typically API-key agnostic, but the SDK requires a value.
+    # OpenAI-compatible endpoints (e.g. vLLM or OpenRouter). Some servers are API-key agnostic,
+    # but the SDK still requires a value.
     return OpenAI(api_key=REMOTE_OCR_API_KEY, base_url=REMOTE_OCR_BASE_URL, timeout=REMOTE_OCR_TIMEOUT_SEC)
 
 

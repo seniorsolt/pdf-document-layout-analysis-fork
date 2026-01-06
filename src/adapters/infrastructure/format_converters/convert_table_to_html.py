@@ -4,7 +4,7 @@ from domain.PdfSegment import PdfSegment
 from pdf_token_type_labels import TokenType
 from rapidocr import RapidOCR
 from rapid_table import ModelType, RapidTable, RapidTableInput
-from configuration import REMOTE_OCR_ENABLED, service_logger
+from configuration import REMOTE_OCR_BASE_URL, REMOTE_OCR_ENABLED, REMOTE_OCR_MODEL, service_logger
 from adapters.infrastructure.remote_ocr.vllm_openai_client import ocr_table_html
 
 
@@ -14,7 +14,10 @@ def extract_table_format(pdf_images: PdfImages, predicted_segments: list[PdfSegm
         return
 
     if REMOTE_OCR_ENABLED:
-        service_logger.info(f"Remote OCR enabled: parsing {len(table_segments)} table segments via vLLM")
+        service_logger.info(
+            f"Remote OCR enabled: parsing {len(table_segments)} table segments "
+            f"via OpenAI-compatible endpoint (base_url={REMOTE_OCR_BASE_URL}, model={REMOTE_OCR_MODEL})"
+        )
         for table_segment in table_segments:
             try:
                 page_image: Image = pdf_images.pdf_images[table_segment.page_number - 1]
