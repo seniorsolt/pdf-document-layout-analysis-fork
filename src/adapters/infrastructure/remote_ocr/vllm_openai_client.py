@@ -59,6 +59,7 @@ def _strip_code_fences(text: str) -> str:
         # remove trailing fence
         if text.rstrip().endswith("```"):
             text = text.rstrip()[:-3]
+    text = text.replace("\n", "")
     return text.strip()
 
 
