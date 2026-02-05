@@ -1,0 +1,56 @@
+x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
+#x-remote-ocr-model: &remote_ocr_model Qwen/Qwen3-VL-8B-Instruct
+
+services:
+  ollama-ocr:
+    image: ollama/ollama:latest
+    container_name: ollama-ocr
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    ports:
+      - "11434:11434"
+    volumes:
+      - ${HOME}/.ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - pdf-analysis-network
+
+  pdf-document-layout-analysis-gpu:
+    container_name: pdf-document-layout-analysis-gpu
+    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    gpus: all
+    ports:
+      - "5060:5060"
+    depends_on:
+      ollama-ocr:
+        condition: service_healthy
+    environment:
+      RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      REMOTE_OCR_ENABLED: "true"
+      REMOTE_OCR_BASE_URL: http://ollama-ocr:11434/v1
+      REMOTE_OCR_API_KEY: "123"
+      REMOTE_OCR_MODEL: *remote_ocr_model
+      REMOTE_OCR_TEMPERATURE: "0.5"
+      REMOTE_OCR_TIMEOUT_SEC: "120"
+      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-64}
+    networks:
+      - pdf-analysis-network
+
+networks:
+  pdf-analysis-network:
+    driver: bridge
+
+
