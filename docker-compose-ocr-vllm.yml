@@ -1,17 +1,17 @@
 x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
+#x-remote-ocr-model: &remote_ocr_model Qwen/Qwen3-VL-8B-Instruct
 
 services:
   vllm-ocr:
     image: vllm/vllm-openai:latest
     container_name: vllm-ocr
-    command: ["--model", *remote_ocr_model, "--host", "0.0.0.0", "--port", "8000", "--gpu_memory_utilization", "0.4", "--max-model-len", "8192"]
+    command: ["--model", *remote_ocr_model, "--host", "0.0.0.0", "--port", "8000", "--gpu-memory-utilization", "0.5", "--max-model-len", "4096", "--max-num-seqs", "64", "--max-num-batched-tokens", "8192"]
     gpus: all
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     ports:
       - "8000:8000"
-    shm_size: "2gb"
     volumes:
       - ${HOME}/.cache/huggingface:/root/.cache/huggingface
     healthcheck:
@@ -46,7 +46,7 @@ services:
       REMOTE_OCR_MODEL: *remote_ocr_model
       REMOTE_OCR_TEMPERATURE: "0.5"
       REMOTE_OCR_TIMEOUT_SEC: "120"
-      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-4}
+      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-64}
     networks:
       - pdf-analysis-network
 
