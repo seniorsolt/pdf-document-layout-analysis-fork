@@ -19,6 +19,7 @@ class ConvertToMarkdownUseCase:
         self,
         pdf_content: bytes,
         use_fast_mode: bool = False,
+        parse_tables_and_math: bool = True,
         extract_toc: bool = False,
         dpi: int = 120,
         output_file: Optional[str] = None,
@@ -26,9 +27,11 @@ class ConvertToMarkdownUseCase:
         translation_model: str = "gpt-oss",
     ) -> Union[str, Response]:
         if use_fast_mode:
-            analysis_result = self.pdf_analysis_service.analyze_pdf_layout_fast(pdf_content, "", True, False)
+            analysis_result = self.pdf_analysis_service.analyze_pdf_layout_fast(
+                pdf_content, "", parse_tables_and_math, False
+            )
         else:
-            analysis_result = self.pdf_analysis_service.analyze_pdf_layout(pdf_content, "", True, False)
+            analysis_result = self.pdf_analysis_service.analyze_pdf_layout(pdf_content, "", parse_tables_and_math, False)
 
         segments: list[SegmentBox] = []
         for item in analysis_result:

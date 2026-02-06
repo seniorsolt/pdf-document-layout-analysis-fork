@@ -426,3 +426,15 @@ class TestEndToEnd(TestCase):
 
         for heading_element in heading_elements:
             self.assertIn(heading_element, result)
+
+    def test_markdown_extraction_without_tables_and_math(self):
+        with open(f"{ROOT_PATH}/test_pdfs/regular.pdf", "rb") as stream:
+            files = {"file": stream}
+            data = {"parse_tables_and_math": "false"}
+
+            results = requests.post(f"{self.service_url}/markdown", files=files, data=data)
+
+        result = results.json()
+        self.assertEqual(200, results.status_code)
+        self.assertIsInstance(result, str)
+        self.assertTrue(result)

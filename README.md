@@ -199,7 +199,7 @@ The service provides a comprehensive RESTful API with the following endpoints:
 
 | Endpoint | Method | Description | Parameters |
 |----------|--------|-------------|------------|
-| `/markdown` | POST | Convert PDF to Markdown (includes segmentation data in zip) | `file`, `fast`, `extract_toc`, `dpi`, `output_file`, `target_languages`, `translation_model` |
+| `/markdown` | POST | Convert PDF to Markdown (includes segmentation data in zip) | `file`, `fast`, `parse_tables_and_math`, `extract_toc`, `dpi`, `output_file`, `target_languages`, `translation_model` |
 | `/html` | POST | Convert PDF to HTML (includes segmentation data in zip) | `file`, `fast`, `extract_toc`, `dpi`, `output_file`, `target_languages`, `translation_model` |
 | `/visualize` | POST | Visualize segmentation results on the PDF | `file`, `fast` |
 
@@ -216,7 +216,7 @@ The service provides a comprehensive RESTful API with the following endpoints:
 
 - **`file`**: PDF file to process (multipart/form-data)
 - **`fast`**: Use LightGBM models instead of VGT (boolean, default: false)
-- **`parse_tables_and_math`**: Apply OCR to table regions (boolean, default: false) and convert formulas to LaTeX
+- **`parse_tables_and_math`**: Apply OCR to table regions (boolean, default: false; `/markdown` default: true) and convert formulas to LaTeX
 - **`language`**: OCR language code (string, default: "en")
 - **`types`**: Comma-separated content types to extract (string, default: "all")
 - **`extract_toc`**: Include table of contents at the beginning of the output (boolean, default: false)
