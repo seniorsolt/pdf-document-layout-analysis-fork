@@ -15,10 +15,32 @@ from configuration import (
 )
 
 
+_MIN_IMAGE_FACTOR = 32
+
+
+def _pad_to_min_size(image: Image.Image, factor: int = _MIN_IMAGE_FACTOR) -> Image.Image:
+    """
+    Pad the image with white pixels so that both width and height are >= *factor*.
+    This prevents VLM backends (e.g. qwen3-vl in ollama) from crashing on tiny crops.
+    """
+    w, h = image.size
+    if w >= factor and h >= factor:
+        return image
+
+    new_w = max(w, factor)
+    new_h = max(h, factor)
+    padded = Image.new("RGB", (new_w, new_h), (255, 255, 255))
+    padded.paste(image, (0, 0))
+    return padded
+
+
 def _pil_image_to_data_url(image: Image.Image, mime: str = "image/png") -> str:
     """
     Convert PIL image into a data URL for OpenAI-compatible 'image_url' inputs.
+    Small images are padded with white to satisfy minimum size requirements.
     """
+    image = _pad_to_min_size(image)
+
     if mime not in {"image/png", "image/jpeg"}:
         mime = "image/png"
 

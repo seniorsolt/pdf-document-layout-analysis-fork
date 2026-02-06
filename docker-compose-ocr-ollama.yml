@@ -1,6 +1,6 @@
-x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
+#x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
 #x-remote-ocr-model: &remote_ocr_model Qwen/Qwen3-VL-8B-Instruct
-
+x-remote-ocr-model: &remote_ocr_model qwen3-vl:8b-instruct-q8_0
 services:
   ollama-ocr:
     image: ollama/ollama:latest
@@ -10,7 +10,7 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     ports:
-      - "3000:11434"
+      - "3001:11434"
     volumes:
       - ${HOME}/.ollama:/root/.ollama
     networks:
