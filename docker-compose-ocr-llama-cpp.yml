@@ -19,6 +19,7 @@ services:
   model-downloader:
     image: curlimages/curl:latest
     container_name: model-downloader
+    user: root
     volumes:
       - llama-cpp-models:/models
     environment:
@@ -33,14 +34,14 @@ services:
         BASE_URL="https://huggingface.co/$${MODEL_REPO}/resolve/main"
 
         if [ ! -f "$${MODEL_FILE}" ]; then
-          echo "Downloading LLM model (~8.7 GB)..."
+          echo "Downloading LLM model..."
           curl -L --progress-bar -o "$${MODEL_FILE}" "$${BASE_URL}/$${MODEL_FILE}"
         else
           echo "LLM model already exists, skipping."
         fi
 
         if [ ! -f "$${MMPROJ_FILE}" ]; then
-          echo "Downloading vision encoder (~1.2 GB)..."
+          echo "Downloading vision encoder..."
           curl -L --progress-bar -o "$${MMPROJ_FILE}" "$${BASE_URL}/$${MMPROJ_FILE}"
         else
           echo "Vision encoder already exists, skipping."
@@ -64,7 +65,7 @@ services:
     ports:
       - "3001:8080"
     volumes:
-      - llama-cpp-models:/models
+      - ./models:/models
     environment:
       LLAMA_ARG_MODEL: *model_path
       LLAMA_ARG_N_GPU_LAYERS: 99
