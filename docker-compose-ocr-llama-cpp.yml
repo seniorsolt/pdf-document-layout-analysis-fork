@@ -19,6 +19,7 @@ services:
   model-downloader:
     image: curlimages/curl:latest
     container_name: model-downloader
+    user: root
     volumes:
       - ./models:/models
     environment:
@@ -62,7 +63,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "3001:8080"
+      - "3000:8080"
     volumes:
       - ./models:/models
     environment:
@@ -77,11 +78,10 @@ services:
       LLAMA_ARG_FLASH_ATTN: 0
       LLAMA_ARG_CONT_BATCHING: 1
       LLAMA_ARG_ENDPOINT_METRICS: 1
-    # --mmproj и --no-flash-attn передаются через command на случай если env не сработает
+    # --mmproj передаётся через command, т.к. env-переменная для него не документирована
     command:
       - "--mmproj"
       - *mmproj_path
-      - "--no-flash-attn"
     networks:
       - pdf-analysis-network
 
