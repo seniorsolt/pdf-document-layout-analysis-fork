@@ -4,8 +4,9 @@
 # с HuggingFace (~10 GB). Файлы сохраняются в ./models/,
 # повторные запуски не требуют повторного скачивания.
 #
-# Параллелизм: LLAMA_N_PARALLEL (по умолчанию 2).
-# Для NVIDIA P40 (24GB) рекомендуется 2-4 слота с ctx-size 4096-8192.
+# Параллелизм: LLAMA_N_PARALLEL (по умолчанию 16).
+# Для NVIDIA P40 (22GB) оптимально 16 слотов по 4096 токенов (макс. batch throughput).
+# CTX_SIZE = N_PARALLEL * 4096. KV-кэш: ~576 MiB на слот (GQA, f16).
 #
 
 x-model-repo: &model_repo Qwen/Qwen3-VL-8B-Instruct-GGUF
@@ -69,8 +70,8 @@ services:
     environment:
       LLAMA_ARG_MODEL: *model_path
       LLAMA_ARG_N_GPU_LAYERS: 99
-      LLAMA_ARG_CTX_SIZE: 8192
-      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-6}
+      LLAMA_ARG_CTX_SIZE: 65536
+      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-16}
       LLAMA_ARG_HOST: 0.0.0.0
       LLAMA_ARG_PORT: 8080
       # Flash Attention: по умолчанию "auto" (включается автоматически).
