@@ -1,18 +1,59 @@
 # Qwen3-VL-8B via llama.cpp server (OpenAI-compatible API)
 #
-# Модели скачиваются автоматически с HuggingFace при первом запуске.
-# Кэш сохраняется в Docker volume "llama-cpp-model-cache",
-# поэтому повторные запуски не требуют повторного скачивания.
+# При первом запуске init-контейнер автоматически скачивает модель и mmproj
+# с HuggingFace (~10 GB). Файлы сохраняются в Docker volume "llama-cpp-models",
+# повторные запуски не требуют повторного скачивания.
 #
 # Параллелизм: LLAMA_N_PARALLEL (по умолчанию 2).
 # Для NVIDIA P40 (24GB) рекомендуется 2-4 слота с ctx-size 4096-8192.
 #
 
+x-model-repo: &model_repo Qwen/Qwen3-VL-8B-Instruct-GGUF
+x-model-file: &model_file Qwen3VL-8B-Instruct-Q8_0.gguf
+x-mmproj-file: &mmproj_file mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf
+x-model-path: &model_path /models/Qwen3VL-8B-Instruct-Q8_0.gguf
+x-mmproj-path: &mmproj_path /models/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf
 x-remote-ocr-model: &remote_ocr_model Qwen3VL-8B-Instruct-Q8_0
+
 services:
+  model-downloader:
+    image: curlimages/curl:latest
+    container_name: model-downloader
+    volumes:
+      - llama-cpp-models:/models
+    environment:
+      MODEL_REPO: *model_repo
+      MODEL_FILE: *model_file
+      MMPROJ_FILE: *mmproj_file
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        cd /models
+        BASE_URL="https://huggingface.co/$${MODEL_REPO}/resolve/main"
+
+        if [ ! -f "$${MODEL_FILE}" ]; then
+          echo "Downloading LLM model (~8.7 GB)..."
+          curl -L --progress-bar -o "$${MODEL_FILE}" "$${BASE_URL}/$${MODEL_FILE}"
+        else
+          echo "LLM model already exists, skipping."
+        fi
+
+        if [ ! -f "$${MMPROJ_FILE}" ]; then
+          echo "Downloading vision encoder (~1.2 GB)..."
+          curl -L --progress-bar -o "$${MMPROJ_FILE}" "$${BASE_URL}/$${MMPROJ_FILE}"
+        else
+          echo "Vision encoder already exists, skipping."
+        fi
+
+        echo "All models ready!"
+
   llama-cpp-ocr:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: llama-cpp-ocr
+    depends_on:
+      model-downloader:
+        condition: service_completed_successfully
     deploy:
       resources:
         reservations:
@@ -23,17 +64,24 @@ services:
     ports:
       - "3001:8080"
     volumes:
-      - llama-cpp-model-cache:/root/.cache
+      - llama-cpp-models:/models
     environment:
-      LLAMA_ARG_HF_REPO: Qwen/Qwen3-VL-8B-Instruct-GGUF
-      LLAMA_ARG_HF_FILE: Qwen3VL-8B-Instruct-Q8_0.gguf
+      LLAMA_ARG_MODEL: *model_path
       LLAMA_ARG_N_GPU_LAYERS: 99
       LLAMA_ARG_CTX_SIZE: 8192
       LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-2}
       LLAMA_ARG_HOST: 0.0.0.0
       LLAMA_ARG_PORT: 8080
+      # Flash Attention: по умолчанию "auto" (включается автоматически).
+      # P40 (Pascal, CC 6.1) не поддерживает FA-ядра в llama.cpp — явно отключаем.
+      LLAMA_ARG_FLASH_ATTN: 0
       LLAMA_ARG_CONT_BATCHING: 1
       LLAMA_ARG_ENDPOINT_METRICS: 1
+    # --mmproj и --no-flash-attn передаются через command на случай если env не сработает
+    command:
+      - "--mmproj"
+      - *mmproj_path
+      - "--no-flash-attn"
     networks:
       - pdf-analysis-network
 
@@ -73,4 +121,4 @@ networks:
     driver: bridge
 
 volumes:
-  llama-cpp-model-cache:
+  llama-cpp-models:
