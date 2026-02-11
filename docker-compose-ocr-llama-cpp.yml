@@ -70,18 +70,27 @@ services:
       LLAMA_ARG_MODEL: *model_path
       LLAMA_ARG_N_GPU_LAYERS: 99
       LLAMA_ARG_CTX_SIZE: 8192
-      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-2}
+      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-6}
       LLAMA_ARG_HOST: 0.0.0.0
       LLAMA_ARG_PORT: 8080
       # Flash Attention: по умолчанию "auto" (включается автоматически).
       # P40 (Pascal, CC 6.1) не поддерживает FA-ядра в llama.cpp — явно отключаем.
-      LLAMA_ARG_FLASH_ATTN: 0
+      # LLAMA_ARG_FLASH_ATTN: 0
       LLAMA_ARG_CONT_BATCHING: 1
       LLAMA_ARG_ENDPOINT_METRICS: 1
-    # --mmproj передаётся через command, т.к. env-переменная для него не документирована
+      # Лимит генерации на запрос: защита от бесконечной генерации на сложных таблицах
+      LLAMA_ARG_N_PREDICT: 2048
+    # Параметры, не имеющие документированных env-переменных, передаются через command.
+    # Sampling defaults (рекомендации Qwen3-VL): применяются, если клиент не передаёт их в запросе.
     command:
       - "--mmproj"
       - *mmproj_path
+      - "--top-k"
+      - "20"
+      - "--top-p"
+      - "0.8"
+      - "--presence-penalty"
+      - "1.5"
     networks:
       - pdf-analysis-network
 
@@ -111,8 +120,8 @@ services:
       REMOTE_OCR_API_KEY: "not-needed"
       REMOTE_OCR_MODEL: *remote_ocr_model
       REMOTE_OCR_TEMPERATURE: "0.7"
-      REMOTE_OCR_TIMEOUT_SEC: "120"
-      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-2}
+      REMOTE_OCR_TIMEOUT_SEC: "100"
+      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-64}
     networks:
       - pdf-analysis-network
 
