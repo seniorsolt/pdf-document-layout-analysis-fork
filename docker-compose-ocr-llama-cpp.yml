@@ -1,0 +1,76 @@
+# Qwen3-VL-8B via llama.cpp server (OpenAI-compatible API)
+#
+# Модели скачиваются автоматически с HuggingFace при первом запуске.
+# Кэш сохраняется в Docker volume "llama-cpp-model-cache",
+# поэтому повторные запуски не требуют повторного скачивания.
+#
+# Параллелизм: LLAMA_N_PARALLEL (по умолчанию 2).
+# Для NVIDIA P40 (24GB) рекомендуется 2-4 слота с ctx-size 4096-8192.
+#
+
+x-remote-ocr-model: &remote_ocr_model Qwen3VL-8B-Instruct-Q8_0
+services:
+  llama-cpp-ocr:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-cpp-ocr
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "3001:8080"
+    volumes:
+      - llama-cpp-model-cache:/root/.cache
+    environment:
+      LLAMA_ARG_HF_REPO: Qwen/Qwen3-VL-8B-Instruct-GGUF
+      LLAMA_ARG_HF_FILE: Qwen3VL-8B-Instruct-Q8_0.gguf
+      LLAMA_ARG_N_GPU_LAYERS: 99
+      LLAMA_ARG_CTX_SIZE: 8192
+      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-2}
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: 8080
+      LLAMA_ARG_CONT_BATCHING: 1
+      LLAMA_ARG_ENDPOINT_METRICS: 1
+    networks:
+      - pdf-analysis-network
+
+  pdf-document-layout-analysis-gpu:
+    container_name: pdf-document-layout-analysis-gpu
+    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "5060:5060"
+    environment:
+      RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      REMOTE_OCR_ENABLED: "true"
+      REMOTE_OCR_BASE_URL: http://llama-cpp-ocr:8080/v1
+      REMOTE_OCR_API_KEY: "not-needed"
+      REMOTE_OCR_MODEL: *remote_ocr_model
+      REMOTE_OCR_TEMPERATURE: "0.7"
+      REMOTE_OCR_TIMEOUT_SEC: "120"
+      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-2}
+    networks:
+      - pdf-analysis-network
+
+networks:
+  pdf-analysis-network:
+    driver: bridge
+
+volumes:
+  llama-cpp-model-cache:
