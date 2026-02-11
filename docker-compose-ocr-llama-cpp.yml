@@ -1,7 +1,7 @@
 # Qwen3-VL-8B via llama.cpp server (OpenAI-compatible API)
 #
 # При первом запуске init-контейнер автоматически скачивает модель и mmproj
-# с HuggingFace (~10 GB). Файлы сохраняются в Docker volume "llama-cpp-models",
+# с HuggingFace (~10 GB). Файлы сохраняются в ./models/,
 # повторные запуски не требуют повторного скачивания.
 #
 # Параллелизм: LLAMA_N_PARALLEL (по умолчанию 2).
@@ -19,9 +19,8 @@ services:
   model-downloader:
     image: curlimages/curl:latest
     container_name: model-downloader
-    user: root
     volumes:
-      - llama-cpp-models:/models
+      - ./models:/models
     environment:
       MODEL_REPO: *model_repo
       MODEL_FILE: *model_file
@@ -121,5 +120,3 @@ networks:
   pdf-analysis-network:
     driver: bridge
 
-volumes:
-  llama-cpp-models:
