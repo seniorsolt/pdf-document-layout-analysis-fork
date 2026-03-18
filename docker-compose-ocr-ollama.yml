@@ -1,6 +1,6 @@
-#x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
+x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
 #x-remote-ocr-model: &remote_ocr_model Qwen/Qwen3-VL-8B-Instruct
-x-remote-ocr-model: &remote_ocr_model qwen3-vl:8b-instruct-q8_0
+# x-remote-ocr-model: &remote_ocr_model qwen3-vl:8b-instruct-q8_0
 services:
   ollama-ocr:
     image: ollama/ollama:latest
@@ -16,11 +16,36 @@ services:
     networks:
       - pdf-analysis-network
 
+  ollama-model-pull:
+    image: ollama/ollama:latest
+    container_name: ollama-model-pull
+    depends_on:
+      - ollama-ocr
+    environment:
+      OLLAMA_HOST: http://ollama-ocr:11434
+      MODEL_NAME: *remote_ocr_model
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        echo "Waiting for Ollama to be ready..."
+        until ollama list 2>/dev/null; do sleep 1; done
+        echo "Pulling model $${MODEL_NAME}..."
+        ollama pull $${MODEL_NAME}
+        echo "Model ready!"
+    networks:
+      - pdf-analysis-network
+
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
     entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
     init: true
     restart: unless-stopped
+    depends_on:
+      ollama-ocr:
+        condition: service_started
+      ollama-model-pull:
+        condition: service_completed_successfully
     build:
       context: .
       dockerfile: Dockerfile
