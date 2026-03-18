@@ -1,4 +1,4 @@
-x-remote-ocr-model: &remote_ocr_model nanonets/Nanonets-OCR2-3B
+x-remote-ocr-model: &remote_ocr_model yasserrmd/Nanonets-OCR2-3B
 #x-remote-ocr-model: &remote_ocr_model Qwen/Qwen3-VL-8B-Instruct
 # x-remote-ocr-model: &remote_ocr_model qwen3-vl:8b-instruct-q8_0
 services:
@@ -28,6 +28,7 @@ services:
     command:
       - -c
       - |
+        set -e
         echo "Waiting for Ollama to be ready..."
         until ollama list 2>/dev/null; do sleep 1; done
         echo "Pulling model $${MODEL_NAME}..."
