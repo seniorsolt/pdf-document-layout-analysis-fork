@@ -16,9 +16,10 @@ services:
       - ${HOME}/.cache/huggingface:/root/.cache/huggingface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
-      interval: 30s
+      interval: 200s
       timeout: 10s
       retries: 10
+      start_period: 2000s
     networks:
       - pdf-analysis-network
 
