@@ -113,6 +113,7 @@ async def get_visualization_endpoint(file: UploadFile = File(...), fast: bool = 
 async def convert_to_markdown_endpoint(
     file: UploadFile = File(...),
     fast: bool = Form(False),
+    parse_tables_and_math: bool = Form(True),
     extract_toc: bool = Form(False),
     dpi: int = Form(120),
     output_file: Optional[str] = Form(None),
@@ -127,6 +128,7 @@ async def convert_to_markdown_endpoint(
         controllers.convert_to_markdown_use_case.execute,
         file.file.read(),
         fast,
+        parse_tables_and_math,
         extract_toc,
         dpi,
         output_file,

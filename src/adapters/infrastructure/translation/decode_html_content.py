@@ -42,7 +42,6 @@ def decode_html(text, link_map, doc_ref_map):
             return match.group(0)
 
     text = re.sub(r"\[DOCREF(\d+)\]", doc_ref_decoder, text)
-    text = text.replace("] (#page", "](#page")
     text = " ".join(text.split())
 
     return text

@@ -1,0 +1,74 @@
+x-remote-ocr-model: &remote_ocr_model yasserrmd/Nanonets-OCR2-3B
+#x-remote-ocr-model: &remote_ocr_model Qwen/Qwen3-VL-8B-Instruct
+# x-remote-ocr-model: &remote_ocr_model qwen3-vl:8b-instruct-q8_0
+services:
+  ollama-ocr:
+    image: ollama/ollama:latest
+    container_name: ollama-ocr
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    ports:
+      - "3001:11434"
+    volumes:
+      - ${HOME}/.ollama:/root/.ollama
+    networks:
+      - pdf-analysis-network
+
+  ollama-model-pull:
+    image: ollama/ollama:latest
+    container_name: ollama-model-pull
+    depends_on:
+      - ollama-ocr
+    environment:
+      OLLAMA_HOST: http://ollama-ocr:11434
+      MODEL_NAME: *remote_ocr_model
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        set -e
+        echo "Waiting for Ollama to be ready..."
+        until ollama list 2>/dev/null; do sleep 1; done
+        echo "Pulling model $${MODEL_NAME}..."
+        ollama pull $${MODEL_NAME}
+        echo "Model ready!"
+    networks:
+      - pdf-analysis-network
+
+  pdf-document-layout-analysis-gpu:
+    container_name: pdf-document-layout-analysis-gpu
+    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
+    init: true
+    restart: unless-stopped
+    depends_on:
+      ollama-ocr:
+        condition: service_started
+      ollama-model-pull:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: Dockerfile
+    gpus: all
+    ports:
+      - "5060:5060"
+    environment:
+      RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      REMOTE_OCR_ENABLED: "true"
+      REMOTE_OCR_BASE_URL: http://ollama-ocr:11434/v1
+      REMOTE_OCR_API_KEY: "123"
+      REMOTE_OCR_MODEL: *remote_ocr_model
+      REMOTE_OCR_TEMPERATURE: "0.5"
+      REMOTE_OCR_TIMEOUT_SEC: "120"
+      REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-64}
+    networks:
+      - pdf-analysis-network
+
+networks:
+  pdf-analysis-network:
+    driver: bridge
+
+
