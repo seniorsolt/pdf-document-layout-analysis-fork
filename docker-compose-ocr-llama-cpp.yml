@@ -1,9 +1,9 @@
 x-model-repo: &model_repo Qwen/Qwen3-VL-8B-Instruct-GGUF
-x-model-file: &model_file Qwen3VL-8B-Instruct-Q8_0.gguf
+x-model-file: &model_file Qwen3VL-8B-Instruct-Q4_K_M.gguf
 x-mmproj-file: &mmproj_file mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf
-x-model-path: &model_path /models/Qwen3VL-8B-Instruct-Q8_0.gguf
+x-model-path: &model_path /models/Qwen3VL-8B-Instruct-Q4_K_M.gguf
 x-mmproj-path: &mmproj_path /models/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf
-x-remote-ocr-model: &remote_ocr_model Qwen3VL-8B-Instruct-Q8_0
+x-remote-ocr-model: &remote_ocr_model Qwen3VL-8B-Instruct-Q4_K_M.gguf
 
 services:
   model-downloader:
@@ -40,7 +40,12 @@ services:
         echo "All models ready!"
 
   llama-cpp-ocr:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    build:
+      context: https://github.com/ggml-org/llama.cpp.git
+      dockerfile: .devops/cuda.Dockerfile
+      target: server
+      args:
+        CUDA_VERSION: ${CUDA_VERSION:-12.2.0}
     container_name: llama-cpp-ocr
     depends_on:
       model-downloader:
@@ -59,8 +64,8 @@ services:
     environment:
       LLAMA_ARG_MODEL: *model_path
       LLAMA_ARG_N_GPU_LAYERS: 99
-      LLAMA_ARG_CTX_SIZE: 65536
-      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-16}
+      LLAMA_ARG_CTX_SIZE: 8192
+      LLAMA_ARG_N_PARALLEL: ${LLAMA_N_PARALLEL:-2}
       LLAMA_ARG_HOST: 0.0.0.0
       LLAMA_ARG_PORT: 8080
       LLAMA_ARG_CONT_BATCHING: 1
