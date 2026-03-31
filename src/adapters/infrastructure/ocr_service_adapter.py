@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import subprocess
@@ -6,22 +7,40 @@ from ports.services.ocr_service import OCRService
 from configuration import OCR_SOURCE, OCR_OUTPUT, OCR_FAILED
 from adapters.infrastructure.ocr.languages import iso_to_tesseract, supported_languages
 
+logger = logging.getLogger(__name__)
+
+OCR_ENGINE = os.environ.get("OCR_ENGINE", "paddleocr")
+
 
 class OCRServiceAdapter(OCRService):
     def process_pdf_ocr(self, filename: str, namespace: str, language: str = "en") -> Path:
         source_pdf_filepath, processed_pdf_filepath, failed_pdf_filepath = self._get_paths(namespace, filename)
         os.makedirs(processed_pdf_filepath.parent, exist_ok=True)
 
-        result = subprocess.run(
-            [
+        if OCR_ENGINE == "paddleocr":
+            cmd = [
+                "ocrmypdf",
+                "--plugin", "ocrmypdf_paddleocr",
+                "--paddle-use-gpu",
+                "-j", "1",
+                "-l",
+                iso_to_tesseract[language],
+                str(source_pdf_filepath),
+                str(processed_pdf_filepath),
+                "--force-ocr",
+            ]
+        else:
+            cmd = [
                 "ocrmypdf",
                 "-l",
                 iso_to_tesseract[language],
-                source_pdf_filepath,
-                processed_pdf_filepath,
+                str(source_pdf_filepath),
+                str(processed_pdf_filepath),
                 "--force-ocr",
             ]
-        )
+
+        logger.info("Running OCR (%s): %s", OCR_ENGINE, " ".join(cmd))
+        result = subprocess.run(cmd)
 
         if result.returncode == 0:
             return processed_pdf_filepath

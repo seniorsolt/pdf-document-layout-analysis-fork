@@ -18,7 +18,6 @@ services:
 
   pdf-document-layout-analysis:
     container_name: pdf-document-layout-analysis
-    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
     init: true
     restart: unless-stopped
     build:
@@ -29,6 +28,9 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
     environment:
       - OLLAMA_HOST=http://ollama:11434
     networks:

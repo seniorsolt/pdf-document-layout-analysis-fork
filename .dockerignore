@@ -3,3 +3,10 @@
 .git
 /detectron2/
 /images/
+/src/
+/models/
+/docs/
+*.pdf
+.idea/
+__pycache__/
+*.ipynb

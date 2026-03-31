@@ -16,7 +16,6 @@ services:
 
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
-    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
     init: true
     restart: unless-stopped
     build:
@@ -34,6 +33,9 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [ gpu ]
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
     environment:
       - RESTART_IF_NO_GPU=$RESTART_IF_NO_GPU
       - OLLAMA_HOST=http://ollama-gpu:11434

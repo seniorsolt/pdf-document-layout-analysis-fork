@@ -88,7 +88,6 @@ services:
 
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
-    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5060", "--timeout", "10000"]
     init: true
     restart: unless-stopped
     build:
@@ -103,6 +102,9 @@ services:
               capabilities: [gpu]
     ports:
       - "5060:5060"
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
     environment:
       RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
       NVIDIA_VISIBLE_DEVICES: all
