@@ -24,8 +24,8 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 COPY requirements.txt requirements.txt
 RUN uv pip install --upgrade pip
-RUN uv pip install paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
 RUN uv pip install -r requirements.txt
+RUN uv pip install --force-reinstall paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
 
 WORKDIR /app
 
