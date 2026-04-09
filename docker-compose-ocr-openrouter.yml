@@ -3,6 +3,7 @@ x-remote-ocr-model: &remote_ocr_model qwen/qwen3-vl-8b-instruct
 services:
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
+    image: pdf-document-layout-analysis-gpu
     init: true
     restart: unless-stopped
     build:
@@ -14,6 +15,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./models:/app/models
+      - paddleocr_models:/home/python/.paddlex
     environment:
       RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
       NVIDIA_VISIBLE_DEVICES: all
@@ -29,6 +31,9 @@ services:
       REMOTE_OCR_MAX_CONCURRENCY: ${REMOTE_OCR_MAX_CONCURRENCY:-4}
     networks:
       - pdf-analysis-network
+
+volumes:
+  paddleocr_models:
 
 networks:
   pdf-analysis-network:

@@ -4,6 +4,7 @@
 /detectron2/
 /images/
 /src/
+!/src/patches/
 /models/
 /docs/
 *.pdf

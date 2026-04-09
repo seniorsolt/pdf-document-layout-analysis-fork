@@ -15,19 +15,19 @@ RUN apt-get update && \
 RUN mkdir -p /app/src /app/models
 
 RUN addgroup --system python && adduser --system --group python
-RUN chown -R python:python /app
+RUN mkdir -p /home/python/.paddlex && chown -R python:python /app /home/python/.paddlex
 USER python
 
 ENV VIRTUAL_ENV=/app/.venv
 RUN python -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
+WORKDIR /app
 COPY requirements.txt requirements.txt
+COPY --chown=python:python src/patches /app/src/patches
 RUN uv pip install --upgrade pip
 RUN uv pip install -r requirements.txt
 RUN uv pip install --force-reinstall paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
-
-WORKDIR /app
 
 RUN git clone https://github.com/facebookresearch/detectron2 /tmp/detectron2 && \
     cd /tmp/detectron2 && \

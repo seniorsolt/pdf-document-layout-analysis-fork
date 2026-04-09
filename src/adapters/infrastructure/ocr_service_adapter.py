@@ -10,6 +10,7 @@ from adapters.infrastructure.ocr.languages import iso_to_tesseract, supported_la
 logger = logging.getLogger(__name__)
 
 OCR_ENGINE = os.environ.get("OCR_ENGINE", "paddleocr")
+OCR_DOWNSAMPLE_ABOVE = int(os.environ.get("OCR_DOWNSAMPLE_ABOVE", "1200"))
 
 
 class OCRServiceAdapter(OCRService):
@@ -28,6 +29,7 @@ class OCRServiceAdapter(OCRService):
                 str(source_pdf_filepath),
                 str(processed_pdf_filepath),
                 "--force-ocr",
+                "--tesseract-downsample-above", str(OCR_DOWNSAMPLE_ABOVE),
             ]
         else:
             cmd = [
