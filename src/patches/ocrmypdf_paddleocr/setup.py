@@ -9,7 +9,4 @@ setup(
         "paddleocr",
         "pillow",
     ],
-    entry_points={
-        "ocrmypdf": ["paddleocr = ocrmypdf_paddleocr.plugin"],
-    },
 )

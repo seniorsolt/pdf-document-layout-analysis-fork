@@ -14,18 +14,37 @@ OCR_DOWNSAMPLE_ABOVE = int(os.environ.get("OCR_DOWNSAMPLE_ABOVE", "1200"))
 
 
 class OCRServiceAdapter(OCRService):
+    @staticmethod
+    def _build_lang_flag(language: str) -> str:
+        """Convert ISO language code(s) to ocrmypdf -l flag value.
+
+        Supports single ('ru') and multiple ('ru+en') languages.
+        For PaddleOCR only the first language is used (plugin limitation).
+        For Tesseract all languages are passed as 'rus+eng'.
+        """
+        parts = language.replace(",", "+").split("+")
+        tesseract_codes = []
+        for part in parts:
+            part = part.strip()
+            if part in iso_to_tesseract:
+                tesseract_codes.append(iso_to_tesseract[part])
+            else:
+                tesseract_codes.append(part)
+        return "+".join(tesseract_codes)
+
     def process_pdf_ocr(self, filename: str, namespace: str, language: str = "en") -> Path:
         source_pdf_filepath, processed_pdf_filepath, failed_pdf_filepath = self._get_paths(namespace, filename)
         os.makedirs(processed_pdf_filepath.parent, exist_ok=True)
 
+        lang_flag = self._build_lang_flag(language)
+
         if OCR_ENGINE == "paddleocr":
             cmd = [
                 "ocrmypdf",
-                "--plugin", "ocrmypdf_paddleocr",
+                "--plugin", "ocrmypdf_paddleocr.plugin",
                 "--paddle-use-gpu",
                 "-j", "1",
-                "-l",
-                iso_to_tesseract[language],
+                "-l", lang_flag,
                 str(source_pdf_filepath),
                 str(processed_pdf_filepath),
                 "--force-ocr",
@@ -34,11 +53,11 @@ class OCRServiceAdapter(OCRService):
         else:
             cmd = [
                 "ocrmypdf",
-                "-l",
-                iso_to_tesseract[language],
+                "-l", lang_flag,
                 str(source_pdf_filepath),
                 str(processed_pdf_filepath),
                 "--force-ocr",
+                "--tesseract-downsample-above", str(OCR_DOWNSAMPLE_ABOVE),
             ]
 
         logger.info("Running OCR (%s): %s", OCR_ENGINE, " ".join(cmd))
