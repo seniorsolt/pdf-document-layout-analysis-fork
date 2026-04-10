@@ -19,6 +19,7 @@ services:
   pdf-document-layout-analysis:
     container_name: pdf-document-layout-analysis
     image: pdf-document-layout-analysis
+    pull_policy: build
     init: true
     restart: unless-stopped
     build:
@@ -31,7 +32,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/app/src
-      - ./models:/app/models
+      - app_models:/app/models
     environment:
       OCR_ENGINE: ${OCR_ENGINE:-tesseract}
       OCR_DOWNSAMPLE_ABOVE: ${OCR_DOWNSAMPLE_ABOVE:-1200}
@@ -58,6 +59,9 @@ services:
       - API_BASE_URL=http://pdf-document-layout-analysis:5060
     networks:
       - pdf-analysis-network
+
+volumes:
+  app_models:
 
 networks:
   pdf-analysis-network:

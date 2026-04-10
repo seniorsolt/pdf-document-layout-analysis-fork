@@ -4,6 +4,7 @@ services:
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
     image: pdf-document-layout-analysis-gpu
+    pull_policy: build
     init: true
     restart: unless-stopped
     build:
@@ -14,7 +15,7 @@ services:
       - "5060:5060"
     volumes:
       - ./src:/app/src
-      - ./models:/app/models
+      - app_models:/app/models
       - paddleocr_models:/home/python/.paddlex
     environment:
       RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
@@ -35,6 +36,7 @@ services:
       - pdf-analysis-network
 
 volumes:
+  app_models:
   paddleocr_models:
 
 networks:
