@@ -18,6 +18,7 @@ services:
 
   pdf-document-layout-analysis:
     container_name: pdf-document-layout-analysis
+    image: pdf-document-layout-analysis
     init: true
     restart: unless-stopped
     build:
@@ -32,7 +33,9 @@ services:
       - ./src:/app/src
       - ./models:/app/models
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      OCR_ENGINE: ${OCR_ENGINE:-tesseract}
+      OCR_DOWNSAMPLE_ABOVE: ${OCR_DOWNSAMPLE_ABOVE:-1200}
+      OLLAMA_HOST: http://ollama:11434
     networks:
       - pdf-analysis-network
 

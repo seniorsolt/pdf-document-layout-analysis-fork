@@ -16,6 +16,7 @@ services:
 
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
+    image: pdf-document-layout-analysis-gpu
     init: true
     restart: unless-stopped
     build:
@@ -36,9 +37,16 @@ services:
     volumes:
       - ./src:/app/src
       - ./models:/app/models
+      - paddleocr_models:/home/python/.paddlex
     environment:
-      - RESTART_IF_NO_GPU=$RESTART_IF_NO_GPU
-      - OLLAMA_HOST=http://ollama-gpu:11434
+      RESTART_IF_NO_GPU: ${RESTART_IF_NO_GPU:-false}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      OCR_ENGINE: ${OCR_ENGINE:-paddleocr}
+      OCR_DOWNSAMPLE_ABOVE: ${OCR_DOWNSAMPLE_ABOVE:-1200}
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
+      PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT: "False"
+      OLLAMA_HOST: http://ollama-gpu:11434
     networks:
       - pdf-analysis-network
 
@@ -61,6 +69,9 @@ services:
       - API_BASE_URL=http://pdf-document-layout-analysis-gpu:5060
     networks:
       - pdf-analysis-network
+
+volumes:
+  paddleocr_models:
 
 networks:
   pdf-analysis-network:
