@@ -10,6 +10,7 @@ from starlette.responses import Response
 
 from configuration import service_logger
 from domain.SegmentBox import SegmentBox
+from domain.pdf_features_loader import load_pdf_features
 from pdf_features.PdfFeatures import PdfFeatures
 from pdf_features.PdfToken import PdfToken
 from pdf_features.Rectangle import Rectangle
@@ -241,7 +242,7 @@ class PdfToMarkupServiceAdapter:
         user_base_name: Optional[str] = None,
     ) -> str:
         pdf_labels: PdfLabels = self._create_pdf_labels_from_segments(vgt_segments)
-        pdf_features: PdfFeatures = PdfFeatures.from_pdf_path(pdf_path)
+        pdf_features: PdfFeatures = load_pdf_features(pdf_path)
         pdf_features.set_token_types(pdf_labels)
         pdf_features.set_token_styles()
 

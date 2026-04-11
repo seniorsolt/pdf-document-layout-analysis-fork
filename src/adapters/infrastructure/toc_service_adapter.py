@@ -4,6 +4,7 @@ from os.path import join
 from pathlib import Path
 from typing import AnyStr
 from domain.PdfSegment import PdfSegment
+from domain.pdf_features_loader import load_pdf_features
 from pdf_features import PdfFeatures, Rectangle
 from pdf_token_type_labels import TokenType
 from ports.services.toc_service import TOCService
@@ -22,7 +23,7 @@ class TOCServiceAdapter(TOCService):
     ) -> list[dict]:
         service_logger.info("Getting TOC")
         pdf_path = self._pdf_content_to_pdf_path(pdf_content)
-        pdf_features: PdfFeatures = PdfFeatures.from_pdf_path(pdf_path)
+        pdf_features: PdfFeatures = load_pdf_features(pdf_path)
         pdf_segments: list[PdfSegment] = self._get_pdf_segments_from_segment_boxes(pdf_features, segment_boxes)
         title_segments = [segment for segment in pdf_segments if segment.segment_type in TITLE_TYPES]
         if skip_document_name:

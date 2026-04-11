@@ -9,6 +9,7 @@ from pdf2image import convert_from_path
 from pdf_features import PdfFeatures
 
 from src.configuration import IMAGES_ROOT_PATH, XMLS_PATH
+from src.domain.pdf_features_loader import load_pdf_features
 
 
 class PdfImages:
@@ -44,7 +45,7 @@ class PdfImages:
         if xml_path and not xml_path.parent.exists():
             os.makedirs(xml_path.parent, exist_ok=True)
 
-        pdf_features: PdfFeatures = PdfFeatures.from_pdf_path(pdf_path, xml_path)
+        pdf_features: PdfFeatures = load_pdf_features(pdf_path, xml_path)
 
         if pdf_name:
             pdf_features.file_name = pdf_name
