@@ -23,6 +23,76 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
+def _apply_sigill_workaround() -> None:
+    """Monkey-patch PaddlePredictorOption to avoid SIGILL on no-AVX CPUs.
+
+    Problem: ``paddle::framework::ir::SelfAttentionFusePass::ApplyImpl``
+    executes AVX instructions at model-load time; on CPUs without AVX
+    (observed on qemu64 VMs) the kernel sends SIGILL and the whole
+    ocrmypdf subprocess dies with returncode=-4 before paddle even
+    gets to print a meaningful error.
+
+    This function patches ``PaddlePredictorOption.__init__`` so that every
+    new predictor option instance:
+
+    1. Forces ``enable_new_ir=True`` (use PIR instead of the legacy
+       ``framework::ir`` where SelfAttentionFusePass lives).
+    2. Adds a handful of known-problematic fusion passes to ``delete_pass``
+       so paddlex's ``config.delete_pass(p)`` call skips them even if they
+       somehow end up scheduled on the new IR path.
+
+    The patch is idempotent (safe to import the plugin multiple times).
+    Any failure is logged but does not break plugin loading — falls back
+    to unpatched paddle behavior.
+    """
+    try:
+        from paddlex.inference import PaddlePredictorOption
+    except Exception as exc:  # paddlex not installed or unexpected layout
+        log.warning("SIGILL workaround skipped: cannot import PaddlePredictorOption (%s)", exc)
+        return
+
+    if getattr(PaddlePredictorOption, "_sigill_workaround_applied", False):
+        return
+
+    _orig_init = PaddlePredictorOption.__init__
+
+    problematic_passes = (
+        "self_attention_fuse_pass",
+        "self_attention_fuse_pass_pir",
+        "fused_self_attention_pass",
+    )
+
+    def _patched_init(self, **kwargs):
+        _orig_init(self, **kwargs)
+        # Force new IR — the legacy IR is where SelfAttentionFusePass lives
+        try:
+            self.enable_new_ir = True
+        except Exception as exc:
+            log.debug("SIGILL workaround: could not set enable_new_ir (%s)", exc)
+        # Preemptively delete known-problematic fusion passes so that
+        # paddlex's ``config.delete_pass(p)`` loop strips them regardless
+        # of which IR path paddle actually takes for a given model.
+        try:
+            current = list(self.delete_pass or [])
+            for pass_name in problematic_passes:
+                if pass_name not in current:
+                    current.append(pass_name)
+            self.delete_pass = current
+        except Exception as exc:
+            log.debug("SIGILL workaround: could not extend delete_pass (%s)", exc)
+
+    PaddlePredictorOption.__init__ = _patched_init
+    PaddlePredictorOption._sigill_workaround_applied = True
+    log.warning(
+        "PaddlePredictorOption patched: enable_new_ir=True, delete_pass+=%s "
+        "(SIGILL workaround for no-AVX CPUs)",
+        problematic_passes,
+    )
+
+
+_apply_sigill_workaround()
+
+
 @hookimpl
 def add_options(parser):
     """Add PaddleOCR-specific options to the argument parser."""
@@ -253,6 +323,11 @@ class PaddleOCREngine(OcrEngine):
             'lang': paddle_lang,
             'use_doc_unwarping': False,
             'use_doc_orientation_classify': False,
+            # Explicitly disable MKLDNN even though PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT
+            # is set via env — some paddleocr versions ignore the env var if the
+            # constructor kwarg is absent. Without this, paddle may still run
+            # MKLDNN code paths that assume AVX and SIGILL on no-AVX CPUs.
+            'enable_mkldnn': False,
         }
 
         if getattr(options, 'paddle_use_gpu', False):

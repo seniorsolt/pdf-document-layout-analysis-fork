@@ -48,6 +48,13 @@ services:
       OCR_DOWNSAMPLE_ABOVE: ${OCR_DOWNSAMPLE_ABOVE:-1200}
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
       PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT: "False"
+      # SIGILL workaround for CPUs without AVX (e.g. qemu64 default VM profile):
+      # cap oneDNN max ISA so that it never emits AVX instructions and
+      # instruct Intel MKL (if paddle was linked against it) to stay at SSE4_2.
+      # Works together with the monkey-patch in ocrmypdf_paddleocr/plugin.py
+      # and with enable_mkldnn=False passed to the PaddleOCR constructor.
+      ONEDNN_MAX_CPU_ISA: "SSE41"
+      MKL_ENABLE_INSTRUCTIONS: "SSE4_2"
       REMOTE_OCR_ENABLED: "true"
       REMOTE_OCR_BASE_URL: http://vllm-ocr:8000/v1
       REMOTE_OCR_API_KEY: "123"
