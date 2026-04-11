@@ -61,21 +61,42 @@ class OCRServiceAdapter(OCRService):
             ]
 
         logger.info("Running OCR (%s): %s", OCR_ENGINE, " ".join(cmd))
-        result = subprocess.run(cmd)
+        # capture_output=True so ocrmypdf's stdout/stderr land in our logger
+        # instead of disappearing into the void on failure (subprocess output
+        # was previously inherited from the parent and could be lost when the
+        # child was OOM-killed before flushing).
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        if stdout:
+            logger.info("ocrmypdf stdout for %s:\n%s", source_pdf_filepath, stdout)
+        if stderr:
+            log = logger.error if result.returncode != 0 else logger.info
+            log("ocrmypdf stderr for %s:\n%s", source_pdf_filepath, stderr)
 
         if result.returncode == 0:
+            logger.info("OCR finished for %s -> %s", source_pdf_filepath, processed_pdf_filepath)
             return processed_pdf_filepath
 
         os.makedirs(failed_pdf_filepath.parent, exist_ok=True)
-        shutil.move(source_pdf_filepath, failed_pdf_filepath)
-        return False
+        try:
+            shutil.move(source_pdf_filepath, failed_pdf_filepath)
+        except Exception:
+            logger.exception("Could not move source pdf to failed folder: %s", source_pdf_filepath)
+
+        raise RuntimeError(
+            f"ocrmypdf failed for {source_pdf_filepath} (returncode={result.returncode})"
+        )
 
     def get_supported_languages(self) -> list[str]:
         return supported_languages()
 
     def _get_paths(self, namespace: str, pdf_file_name: str) -> tuple[Path, Path, Path]:
-        file_name = "".join(pdf_file_name.split(".")[:-1]) if "." in pdf_file_name else pdf_file_name
+        # NOTE: pdf_file_name may legitimately contain dots (e.g. "1. DD/13.6/foo.pdf")
+        # so we cannot use split(".")[:-1] to strip the extension — Path.with_suffix
+        # only touches the trailing extension and leaves the rest of the name alone.
         source_pdf_filepath = Path(OCR_SOURCE, namespace, pdf_file_name)
-        processed_pdf_filepath = Path(OCR_OUTPUT, namespace, f"{file_name}.pdf")
+        processed_pdf_filepath = Path(OCR_OUTPUT, namespace, pdf_file_name).with_suffix(".pdf")
         failed_pdf_filepath = Path(OCR_FAILED, namespace, pdf_file_name)
         return source_pdf_filepath, processed_pdf_filepath, failed_pdf_filepath
