@@ -3,6 +3,7 @@ import warnings
 import logging
 import os
 import sys
+from pathlib import Path
 from domain.PdfImages import PdfImages
 from domain.PdfSegment import PdfSegment
 from ports.services.ml_model_service import MLModelService
@@ -15,7 +16,7 @@ from adapters.ml.vgt.create_word_grid import create_word_grid, remove_word_grids
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.data.datasets import register_coco_instances
 from detectron2.data import DatasetCatalog
-from configuration import JSON_TEST_FILE_PATH, IMAGES_ROOT_PATH
+from configuration import JSON_TEST_FILE_PATH
 
 
 class DevNull:
@@ -83,25 +84,26 @@ with suppress_logs():
 
 class VGTModelAdapter(MLModelService):
 
-    def _register_data(self) -> None:
+    def _register_data(self, image_root: Path) -> None:
         try:
             DatasetCatalog.remove("predict_data")
         except KeyError:
             pass
 
-        register_coco_instances("predict_data", {}, JSON_TEST_FILE_PATH, IMAGES_ROOT_PATH)
+        register_coco_instances("predict_data", {}, JSON_TEST_FILE_PATH, str(image_root))
 
     def predict_document_layout(self, pdf_images: list[PdfImages]) -> list[PdfSegment]:
         create_word_grid([pdf_images_obj.pdf_features for pdf_images_obj in pdf_images])
         get_annotations(pdf_images)
 
-        self._register_data()
+        self._register_data(pdf_images[0].images_dir)
         with suppress_logs():
             VGTTrainer.test(configuration, model)
 
         predicted_segments = get_most_probable_pdf_segments("doclaynet", pdf_images, False)
 
-        PdfImages.remove_images()
+        for pdf_images_obj in pdf_images:
+            pdf_images_obj.remove_images()
         remove_word_grids()
 
         return get_reading_orders(pdf_images, predicted_segments)

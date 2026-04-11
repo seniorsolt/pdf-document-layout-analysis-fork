@@ -3,8 +3,6 @@ import shutil
 
 import cv2
 import numpy as np
-from os import makedirs
-from os.path import join
 from pathlib import Path
 from PIL import Image
 from pdf2image import convert_from_path
@@ -18,6 +16,9 @@ class PdfImages:
         self.pdf_features: PdfFeatures = pdf_features
         self.pdf_images: list[Image] = pdf_images
         self.dpi: int = dpi
+        # Per-request isolated workdir: UUID-based subdirectory under shared IMAGES_ROOT_PATH.
+        # Prevents concurrent requests from racing on cleanup of a shared directory.
+        self.images_dir: Path = Path(IMAGES_ROOT_PATH) / pdf_features.file_name
         self.save_images()
 
     def show_images(self, next_image_delay: int = 2):
@@ -28,14 +29,13 @@ class PdfImages:
             cv2.destroyAllWindows()
 
     def save_images(self):
-        makedirs(IMAGES_ROOT_PATH, exist_ok=True)
+        self.images_dir.mkdir(parents=True, exist_ok=True)
         for image_index, image in enumerate(self.pdf_images):
             image_name = f"{self.pdf_features.file_name}_{image_index}.jpg"
-            image.save(join(IMAGES_ROOT_PATH, image_name))
+            image.save(str(self.images_dir / image_name))
 
-    @staticmethod
-    def remove_images():
-        shutil.rmtree(IMAGES_ROOT_PATH)
+    def remove_images(self) -> None:
+        shutil.rmtree(self.images_dir, ignore_errors=True)
 
     @staticmethod
     def from_pdf_path(pdf_path: str | Path, pdf_name: str = "", xml_file_name: str = "", dpi: int = 72):
