@@ -28,7 +28,7 @@ COPY --chown=python:python src/patches /app/src/patches
 RUN uv pip install --upgrade pip
 RUN uv pip install -r requirements.txt
 RUN uv pip install --force-reinstall --no-deps ./src/patches/ocrmypdf_paddleocr
-RUN uv pip install --force-reinstall paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+RUN uv pip install --force-reinstall paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu123/ --extra-index-url https://pypi.org/simple/
 
 RUN git clone https://github.com/facebookresearch/detectron2 /tmp/detectron2 && \
     cd /tmp/detectron2 && \
