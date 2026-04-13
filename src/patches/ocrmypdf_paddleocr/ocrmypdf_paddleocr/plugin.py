@@ -246,7 +246,7 @@ class PaddleOCREngine(OcrEngine):
             del os.environ['OMP_THREAD_LIMIT']
 
         paddle_lang = PaddleOCREngine._get_paddle_lang(options)
-        log.debug(f"Initializing PaddleOCR with language: {paddle_lang}")
+        log.info(f"Initializing PaddleOCR with language: {paddle_lang}")
 
         kwargs = {
             'use_textline_orientation': False,
@@ -267,7 +267,7 @@ class PaddleOCREngine(OcrEngine):
         if hasattr(options, 'paddle_cls_model_dir') and options.paddle_cls_model_dir:
             kwargs['textline_orientation_model_dir'] = options.paddle_cls_model_dir
 
-        log.debug(f"Creating PaddleOCR with kwargs: {kwargs}")
+        log.info(f"Creating PaddleOCR with kwargs: {kwargs}")
         PaddleOCREngine._cached_ocr = PaddleOCR(**kwargs)
         return PaddleOCREngine._cached_ocr
 
@@ -546,7 +546,7 @@ class PaddleOCREngine(OcrEngine):
     @staticmethod
     def _generate_hocr_classic(input_file: Path, output_hocr: Path, output_text: Path, options):
         """Generate hOCR output for an image using classic PaddleOCR pipeline."""
-        log.debug(f"Running PaddleOCR on {input_file}")
+        log.info(f"Running PaddleOCR on {input_file}")
 
         # Initialize PaddleOCR
         paddle_ocr = PaddleOCREngine._get_paddle_ocr(options)
@@ -555,10 +555,12 @@ class PaddleOCREngine(OcrEngine):
         with Image.open(input_file) as img:
             width, height = img.size
             dpi = img.info.get('dpi', (300, 300))
-            log.debug(f"Input image: {width}x{height}, DPI: {dpi}")
+            log.info(f"Input image: {width}x{height}, DPI: {dpi}")
 
         # Run OCR
         result = paddle_ocr.predict(str(input_file), return_word_box=True)
+        log.info(f"PaddleOCR predict returned: type={type(result).__name__}, "
+                 f"len={len(result) if result else 0}")
 
         # Calculate scaling factors from preprocessed image
         scale_x = 1.0
@@ -623,7 +625,10 @@ class PaddleOCREngine(OcrEngine):
             text_word_regions = ocr_result.get('text_word_region', [])
 
             has_word_boxes = bool(text_words and text_word_regions)
-            log.debug(f"PaddleOCR found {len(texts)} text regions, word boxes: {has_word_boxes}")
+            log.info(f"PaddleOCR found {len(texts)} text regions, word boxes: {has_word_boxes}")
+            if not texts:
+                log.warning(f"PaddleOCR returned 0 text regions for {input_file}. "
+                            f"Result keys: {list(ocr_result.keys()) if hasattr(ocr_result, 'keys') else 'N/A'}")
 
             word_id = 1
             carea_id = 1
@@ -835,7 +840,8 @@ class PaddleOCREngine(OcrEngine):
         text_content = '\n'.join(all_text)
         output_text.write_text(text_content, encoding='utf-8')
 
-        log.debug(f"Generated hOCR with {len(all_text)} text regions")
+        total_chars = sum(len(t) for t in all_text)
+        log.info(f"Generated hOCR with {len(all_text)} text regions, {total_chars} chars total")
 
     @staticmethod
     def generate_pdf(input_file: Path, output_pdf: Path, output_text: Path, options):
