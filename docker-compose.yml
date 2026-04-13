@@ -19,7 +19,6 @@ services:
   pdf-document-layout-analysis:
     container_name: pdf-document-layout-analysis
     image: pdf-document-layout-analysis
-    pull_policy: build
     init: true
     restart: unless-stopped
     build:

@@ -24,7 +24,6 @@ services:
   pdf-document-layout-analysis-gpu:
     container_name: pdf-document-layout-analysis-gpu
     image: pdf-document-layout-analysis-gpu
-    pull_policy: build
     init: true
     restart: unless-stopped
     build:
