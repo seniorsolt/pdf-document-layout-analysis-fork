@@ -21,7 +21,7 @@ from configuration import (
 logger = logging.getLogger(__name__)
 
 _MIN_IMAGE_FACTOR = 32
-_VISUAL_TOKEN_PIXELS = 3136  # Qwen2.5-VL: patch=14, merge=2 -> one visual token covers 28*28*4 px
+_VISUAL_TOKEN_PIXELS = 784  # Qwen2.5-VL: one visual token covers (patch_size * spatial_merge_size)^2 = (14*2)^2 = 784 px
 
 
 def _pad_to_min_size(image: Image.Image, factor: int = _MIN_IMAGE_FACTOR) -> Image.Image:
