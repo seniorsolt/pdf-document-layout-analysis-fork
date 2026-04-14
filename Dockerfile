@@ -26,7 +26,7 @@ WORKDIR /app
 COPY requirements.lock.txt requirements.lock.txt
 COPY --chown=python:python src/patches /app/src/patches
 RUN uv pip install --upgrade pip
-RUN uv pip install -r requirements.lock.txt \
+RUN uv pip install --no-deps -r requirements.lock.txt \
     --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ \
     --extra-index-url https://download.pytorch.org/whl/cu126 \
     --extra-index-url https://pypi.org/simple/ \
