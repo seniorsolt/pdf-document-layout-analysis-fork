@@ -222,7 +222,6 @@ nvidia-cusparse-cu12==12.5.4.2
     #   torch
 nvidia-cusparselt-cu12==0.6.3
     # via
-    #   --override requirements.overrides.in
     #   paddlepaddle-gpu
     #   torch
 nvidia-nccl-cu12==2.26.2
@@ -286,7 +285,7 @@ paddleocr==3.4.1
     # via
     #   -r requirements.in
     #   ocrmypdf-paddleocr
-paddlepaddle-gpu==3.3.1
+paddlepaddle-gpu==3.2.0
     # via -r requirements.in
 paddlex==3.4.3
     # via paddleocr
@@ -463,7 +462,7 @@ tokenizers==0.19.1
     # via
     #   pix2tex
     #   transformers
-torch==2.7.1+cu126
+torch==2.7.0+cu126
     # via
     #   -r requirements.in
     #   entmax
@@ -471,7 +470,7 @@ torch==2.7.1+cu126
     #   timm
     #   torchvision
     #   x-transformers
-torchvision==0.22.1+cu126
+torchvision==0.22.0+cu126
     # via
     #   -r requirements.in
     #   timm
@@ -488,7 +487,7 @@ transformers==4.40.2
     # via
     #   -r requirements.in
     #   pix2tex
-triton==3.3.1
+triton==3.3.0
     # via torch
 typer==0.24.1
     # via fastapi-cli
