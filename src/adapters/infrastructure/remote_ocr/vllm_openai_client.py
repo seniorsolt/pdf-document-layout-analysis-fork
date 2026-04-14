@@ -1,5 +1,7 @@
 import base64
 import io
+import logging
+import math
 import threading
 from typing import Optional
 
@@ -9,13 +11,17 @@ from PIL import Image
 from configuration import (
     REMOTE_OCR_API_KEY,
     REMOTE_OCR_BASE_URL,
+    REMOTE_OCR_MAX_IMAGE_TOKENS,
     REMOTE_OCR_MODEL,
     REMOTE_OCR_TEMPERATURE,
     REMOTE_OCR_TIMEOUT_SEC,
 )
 
 
+logger = logging.getLogger(__name__)
+
 _MIN_IMAGE_FACTOR = 32
+_VISUAL_TOKEN_PIXELS = 3136  # Qwen2.5-VL: patch=14, merge=2 -> one visual token covers 28*28*4 px
 
 
 def _pad_to_min_size(image: Image.Image, factor: int = _MIN_IMAGE_FACTOR) -> Image.Image:
@@ -34,11 +40,33 @@ def _pad_to_min_size(image: Image.Image, factor: int = _MIN_IMAGE_FACTOR) -> Ima
     return padded
 
 
+def _downscale_to_token_budget(image: Image.Image, max_tokens: int) -> Image.Image:
+    if max_tokens <= 0:
+        return image
+
+    w, h = image.size
+    current_tokens = (w * h) / _VISUAL_TOKEN_PIXELS
+    if current_tokens <= max_tokens:
+        return image
+
+    scale = math.sqrt(max_tokens / current_tokens)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    resized = image.resize((new_w, new_h), Image.LANCZOS)
+    logger.debug(
+        "Downscaled OCR image %dx%d -> %dx%d (~%.0f -> ~%.0f visual tokens)",
+        w, h, new_w, new_h, current_tokens, (new_w * new_h) / _VISUAL_TOKEN_PIXELS,
+    )
+    return resized
+
+
 def _pil_image_to_data_url(image: Image.Image, mime: str = "image/png") -> str:
     """
     Convert PIL image into a data URL for OpenAI-compatible 'image_url' inputs.
-    Small images are padded with white to satisfy minimum size requirements.
+    Large images are downscaled to fit REMOTE_OCR_MAX_IMAGE_TOKENS;
+    small images are padded with white to satisfy minimum size requirements.
     """
+    image = _downscale_to_token_budget(image, REMOTE_OCR_MAX_IMAGE_TOKENS)
     image = _pad_to_min_size(image)
 
     if mime not in {"image/png", "image/jpeg"}:

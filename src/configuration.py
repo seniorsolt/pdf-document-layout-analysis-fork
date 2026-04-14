@@ -21,6 +21,7 @@ REMOTE_OCR_MODEL = os.environ.get("REMOTE_OCR_MODEL", "nanonets/Nanonets-OCR2-1.
 REMOTE_OCR_TEMPERATURE = float(os.environ.get("REMOTE_OCR_TEMPERATURE", "0.5"))
 REMOTE_OCR_TIMEOUT_SEC = float(os.environ.get("REMOTE_OCR_TIMEOUT_SEC", "120"))
 REMOTE_OCR_MAX_CONCURRENCY = max(1, int(os.environ.get("REMOTE_OCR_MAX_CONCURRENCY", "4")))
+REMOTE_OCR_MAX_IMAGE_TOKENS = max(0, int(os.environ.get("REMOTE_OCR_MAX_IMAGE_TOKENS", "0")))
 
 IMAGES_ROOT_PATH = Path(ROOT_PATH, "images")
 WORD_GRIDS_PATH = Path(ROOT_PATH, "word_grids")
