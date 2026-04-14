@@ -1,4 +1,5 @@
 import contextlib
+import threading
 import warnings
 import logging
 import os
@@ -15,7 +16,7 @@ from adapters.ml.vgt.get_json_annotations import get_annotations
 from adapters.ml.vgt.create_word_grid import create_word_grid, remove_word_grids
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.data.datasets import register_coco_instances
-from detectron2.data import DatasetCatalog
+from detectron2.data import DatasetCatalog, MetadataCatalog
 from configuration import JSON_TEST_FILE_PATH
 
 
@@ -81,6 +82,8 @@ with suppress_logs():
     model = VGTTrainer.build_model(configuration)
     DetectionCheckpointer(model, save_dir=configuration.OUTPUT_DIR).resume_or_load(configuration.MODEL.WEIGHTS, resume=True)
 
+_inference_lock = threading.Lock()
+
 
 class VGTModelAdapter(MLModelService):
 
@@ -89,24 +92,29 @@ class VGTModelAdapter(MLModelService):
             DatasetCatalog.remove("predict_data")
         except KeyError:
             pass
+        try:
+            MetadataCatalog.remove("predict_data")
+        except KeyError:
+            pass
 
         register_coco_instances("predict_data", {}, JSON_TEST_FILE_PATH, str(image_root))
 
     def predict_document_layout(self, pdf_images: list[PdfImages]) -> list[PdfSegment]:
-        create_word_grid([pdf_images_obj.pdf_features for pdf_images_obj in pdf_images])
-        get_annotations(pdf_images)
+        with _inference_lock:
+            create_word_grid([pdf_images_obj.pdf_features for pdf_images_obj in pdf_images])
+            get_annotations(pdf_images)
 
-        self._register_data(pdf_images[0].images_dir)
-        with suppress_logs():
-            VGTTrainer.test(configuration, model)
+            self._register_data(pdf_images[0].images_dir)
+            with suppress_logs():
+                VGTTrainer.test(configuration, model)
 
-        predicted_segments = get_most_probable_pdf_segments("doclaynet", pdf_images, False)
+            predicted_segments = get_most_probable_pdf_segments("doclaynet", pdf_images, False)
 
-        for pdf_images_obj in pdf_images:
-            pdf_images_obj.remove_images()
-        remove_word_grids()
+            for pdf_images_obj in pdf_images:
+                pdf_images_obj.remove_images()
+            remove_word_grids()
 
-        return get_reading_orders(pdf_images, predicted_segments)
+            return get_reading_orders(pdf_images, predicted_segments)
 
     def predict_layout_fast(self, pdf_images: list[PdfImages]) -> list[PdfSegment]:
         raise NotImplementedError("Fast prediction should be handled by FastTrainerAdapter")
