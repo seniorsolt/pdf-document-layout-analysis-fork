@@ -48,6 +48,7 @@ class OCRServiceAdapter(OCRService):
                 str(source_pdf_filepath),
                 str(processed_pdf_filepath),
                 "--force-ocr",
+                "--invalidate-digital-signatures",
                 "--tesseract-downsample-above", str(OCR_DOWNSAMPLE_ABOVE),
             ]
         else:
@@ -57,6 +58,7 @@ class OCRServiceAdapter(OCRService):
                 str(source_pdf_filepath),
                 str(processed_pdf_filepath),
                 "--force-ocr",
+                "--invalidate-digital-signatures",
                 "--tesseract-downsample-above", str(OCR_DOWNSAMPLE_ABOVE),
             ]
 
